@@ -150,44 +150,78 @@ Publish the config file:
 php artisan vendor:publish --tag=toon-config
 ```
 
+### Basic Options
+
 ```php
 // config/toon.php
 return [
-    /*
-    |--------------------------------------------------------------------------
-    | Minimum Rows for Table Format
-    |--------------------------------------------------------------------------
-    |
-    | Arrays with fewer items than this will be encoded as regular objects
-    | instead of the compact tabular format. Set to 1 to always use tables
-    | for uniform arrays, or higher to only use tables for larger datasets.
-    |
-    */
+    // Arrays with fewer items use regular object format instead of tables
     'min_rows_for_table' => 2,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Maximum Flatten Depth
-    |--------------------------------------------------------------------------
-    |
-    | How many levels deep to flatten nested objects in arrays. Objects nested
-    | deeper than this will be JSON-encoded as a string value. Increase for
-    | deeply nested data, decrease if you have very wide objects.
-    |
-    */
+    // How deep to flatten nested objects (deeper = JSON string)
     'max_flatten_depth' => 3,
 
-    /*
-    |--------------------------------------------------------------------------
-    | Escape Style
-    |--------------------------------------------------------------------------
-    |
-    | How to escape special characters (comma, colon, newline) in string values.
-    | Currently only 'backslash' is supported: Hello, World → Hello\, World
-    |
-    */
+    // Escape style for special characters (comma, colon, newline)
     'escape_style' => 'backslash',
 ];
+```
+
+### Token-Saving Options
+
+```php
+return [
+    // Omit values to save tokens: 'null', 'empty', 'false', or 'all'
+    'omit' => ['null', 'empty'],
+
+    // Always skip these keys
+    'omit_keys' => ['created_at', 'updated_at'],
+
+    // Shorten verbose keys
+    'key_aliases' => [
+        'description' => 'desc',
+        'organization_id' => 'org_id',
+    ],
+];
+```
+
+### Value Transformation
+
+```php
+return [
+    // Format dates (DateTime objects and ISO strings)
+    'date_format' => 'Y-m-d',
+
+    // Truncate long strings (adds ... suffix)
+    'truncate_strings' => 100,
+
+    // Limit decimal places for floats
+    'number_precision' => 2,
+];
+```
+
+## Utility Methods
+
+### Measure Savings
+
+```php
+$data = User::with('roles')->get()->toArray();
+
+$diff = Toon::diff($data);
+// [
+//     'json_chars' => 12500,
+//     'toon_chars' => 5200,
+//     'saved_chars' => 7300,
+//     'savings_percent' => 58.4,
+// ]
+```
+
+### Encode Specific Keys Only
+
+```php
+$users = User::all()->toArray();
+
+// Only include id and name, exclude email, password, etc.
+$toon = Toon::only($users, ['id', 'name']);
 ```
 
 ## Use Cases

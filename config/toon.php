@@ -53,4 +53,104 @@ return [
     */
     'escape_style' => 'backslash',
 
+    /*
+    |--------------------------------------------------------------------------
+    | Omit Values
+    |--------------------------------------------------------------------------
+    |
+    | Specify which value types to omit from the output. This saves tokens
+    | when your data has many optional/nullable fields or default values.
+    |
+    | Supported values:
+    |   - 'null'  : Omit keys with null values
+    |   - 'empty' : Omit keys with empty string values ('')
+    |   - 'false' : Omit keys with false values
+    |   - 'all'   : Shorthand for ['null', 'empty', 'false']
+    |
+    | Example with omit = ['null', 'empty']:
+    |   ['name' => 'Alice', 'email' => null, 'bio' => '']  →  name: Alice
+    |
+    | Note: In tabular format, these values are still represented as empty
+    | cells to maintain column alignment.
+    |
+    */
+    'omit' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Omit Keys
+    |--------------------------------------------------------------------------
+    |
+    | Specify keys that should always be omitted from the output, regardless
+    | of their value. Useful for excluding verbose or unnecessary fields.
+    |
+    | Example:
+    |   'omit_keys' => ['created_at', 'updated_at', 'deleted_at']
+    |
+    */
+    'omit_keys' => [],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Key Aliases
+    |--------------------------------------------------------------------------
+    |
+    | Map long key names to shorter aliases to save tokens. Aliases are applied
+    | to both regular key-value pairs and table column headers.
+    |
+    | Uncomment or add your own aliases:
+    |
+    */
+    'key_aliases' => [
+        // 'created_at' => 'c@',
+        // 'updated_at' => 'u@',
+        // 'deleted_at' => 'd@',
+        // 'description' => 'desc',
+        // 'organization_id' => 'org_id',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Date Format
+    |--------------------------------------------------------------------------
+    |
+    | Format DateTime objects and ISO date strings using this format. When null,
+    | dates are passed through as-is. Uses PHP date format syntax.
+    |
+    | Examples:
+    |   'Y-m-d H:i'   → 2024-01-15 14:30
+    |   'Y-m-d'       → 2024-01-15
+    |   'd/m/Y'       → 15/01/2024
+    |
+    */
+    'date_format' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Truncate Strings
+    |--------------------------------------------------------------------------
+    |
+    | Maximum length for string values. Strings exceeding this length will be
+    | truncated with an ellipsis (...). When null, strings are not truncated.
+    |
+    | Example with truncate_strings = 50:
+    |   'A very long description...'
+    |
+    */
+    'truncate_strings' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Number Precision
+    |--------------------------------------------------------------------------
+    |
+    | Maximum decimal places for float values. When null, floats are passed
+    | through as-is. Useful for reducing precision on monetary values etc.
+    |
+    | Example with number_precision = 2:
+    |   3.14159 → 3.14
+    |
+    */
+    'number_precision' => null,
+
 ];

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace MischaSigtermans\Toon\Converters;
 
+use Carbon\Carbon;
+use DateTimeInterface;
 use Illuminate\Support\Facades\Config;
 use MischaSigtermans\Toon\Support\ArrayFlattener;
 
@@ -15,12 +17,36 @@ class ToonEncoder
 
     protected string $escapeStyle;
 
+    protected array $omit;
+
+    protected array $omitKeys;
+
+    protected array $keyAliases;
+
+    protected ?string $dateFormat;
+
+    protected ?int $truncateStrings;
+
+    protected ?int $numberPrecision;
+
     public function __construct(?ArrayFlattener $flattener = null)
     {
         $maxDepth = (int) Config::get('toon.max_flatten_depth', 3);
         $this->flattener = $flattener ?? new ArrayFlattener($maxDepth);
         $this->minRowsForTable = (int) Config::get('toon.min_rows_for_table', 2);
         $this->escapeStyle = (string) Config::get('toon.escape_style', 'backslash');
+        $this->omit = (array) Config::get('toon.omit', []);
+        $this->omitKeys = (array) Config::get('toon.omit_keys', []);
+        $this->keyAliases = (array) Config::get('toon.key_aliases', []);
+        $this->dateFormat = Config::get('toon.date_format');
+        $this->truncateStrings = Config::get('toon.truncate_strings');
+        $this->numberPrecision = Config::get('toon.number_precision');
+    }
+
+    protected function shouldOmit(string $type): bool
+    {
+        return in_array('all', $this->omit, true)
+            || in_array($type, $this->omit, true);
     }
 
     public function encode(mixed $input): string
@@ -74,7 +100,7 @@ class ToonEncoder
     protected function flattenedToToon(array $flattened, int $depth): string
     {
         $indent = str_repeat('  ', $depth);
-        $columns = $flattened['columns'];
+        $columns = array_map(fn ($col) => $this->formatKey($col), $flattened['columns']);
         $rows = $flattened['rows'];
 
         $header = $indent.'items['.count($rows).']{'.implode(',', $columns).'}:';
@@ -94,9 +120,10 @@ class ToonEncoder
         }
 
         $fields = array_keys((array) $arr[0]);
+        $formattedFields = array_map(fn ($f) => $this->formatKey($f), $fields);
         $indent = str_repeat('  ', $depth);
 
-        $header = $indent.'items['.count($arr).']{'.implode(',', $fields).'}:';
+        $header = $indent.'items['.count($arr).']{'.implode(',', $formattedFields).'}:';
 
         $rows = [];
         foreach ($arr as $item) {
@@ -129,12 +156,28 @@ class ToonEncoder
         $lines = [];
 
         foreach ($arr as $key => $val) {
-            $safeKey = $this->safeKey((string) $key);
+            if (in_array($key, $this->omitKeys, true)) {
+                continue;
+            }
+
+            if ($this->shouldOmit('null') && $val === null) {
+                continue;
+            }
+
+            if ($this->shouldOmit('empty') && $val === '') {
+                continue;
+            }
+
+            if ($this->shouldOmit('false') && $val === false) {
+                continue;
+            }
+
+            $formattedKey = $this->formatKey((string) $key);
 
             if ($this->isScalar($val)) {
-                $lines[] = $indent.$safeKey.': '.$this->escapeScalar($val);
+                $lines[] = $indent.$formattedKey.': '.$this->escapeScalar($val);
             } else {
-                $lines[] = $indent.$safeKey.':';
+                $lines[] = $indent.$formattedKey.':';
                 $lines[] = $this->valueToToon($val, $depth + 1);
             }
         }
@@ -152,7 +195,25 @@ class ToonEncoder
             return $v ? 'true' : 'false';
         }
 
-        if (is_int($v) || is_float($v)) {
+        // Handle DateTime objects
+        if ($v instanceof DateTimeInterface) {
+            if ($this->dateFormat !== null) {
+                return $v->format($this->dateFormat);
+            }
+
+            return $v->format('Y-m-d\TH:i:sP');
+        }
+
+        // Handle number precision for floats
+        if (is_float($v)) {
+            if ($this->numberPrecision !== null) {
+                return number_format($v, $this->numberPrecision, '.', '');
+            }
+
+            return (string) $v;
+        }
+
+        if (is_int($v)) {
             return (string) $v;
         }
 
@@ -160,7 +221,18 @@ class ToonEncoder
             return json_encode($v) ?: '[]';
         }
 
-        $s = trim(preg_replace('/\s+/', ' ', (string) $v) ?? '');
+        $s = (string) $v;
+
+        // Format ISO date strings if date_format is set
+        if ($this->dateFormat !== null && $this->looksLikeIsoDate($s)) {
+            try {
+                return Carbon::parse($s)->format($this->dateFormat);
+            } catch (\Exception) {
+                // If parsing fails, continue with normal string processing
+            }
+        }
+
+        $s = trim(preg_replace('/\s+/', ' ', $s) ?? '');
 
         if ($this->escapeStyle === 'backslash') {
             $s = str_replace('\\', '\\\\', $s);
@@ -169,7 +241,19 @@ class ToonEncoder
             $s = str_replace("\n", '\\n', $s);
         }
 
+        // Truncate strings if configured
+        if ($this->truncateStrings !== null && strlen($s) > $this->truncateStrings) {
+            $s = substr($s, 0, $this->truncateStrings).'...';
+        }
+
         return $s;
+    }
+
+    protected function looksLikeIsoDate(string $s): bool
+    {
+        // Match common ISO 8601 date formats:
+        // 2024-01-15, 2024-01-15T14:30:00, 2024-01-15 14:30:00, etc.
+        return (bool) preg_match('/^\d{4}-\d{2}-\d{2}([T\s]\d{2}:\d{2}(:\d{2})?)?/', $s);
     }
 
     protected function safeKey(string $k): string
@@ -177,9 +261,14 @@ class ToonEncoder
         return preg_replace('/[^A-Za-z0-9_\-\.]/', '', $k) ?? $k;
     }
 
+    protected function formatKey(string $key): string
+    {
+        return $this->keyAliases[$key] ?? $this->safeKey($key);
+    }
+
     protected function isScalar(mixed $v): bool
     {
-        return is_null($v) || is_scalar($v);
+        return is_null($v) || is_scalar($v) || $v instanceof DateTimeInterface;
     }
 
     protected function looksLikeJson(string $s): bool
