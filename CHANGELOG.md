@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2025-12-08
+
+### Fixed
+- Laravel Collections are now properly converted to arrays before encoding, preventing JSON fallback output
+- Other `Arrayable` and `Traversable` objects are also handled correctly
+
 ## [0.2.0] - 2025-12-08
 
 ### Added

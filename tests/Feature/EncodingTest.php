@@ -415,3 +415,41 @@ it('leaves dates unchanged when date_format is null', function () {
     // Should keep the original ISO format (with escaping for special chars)
     expect($toon)->toContain('2024-01-15T14\\:30\\:00+00\\:00');
 });
+
+it('handles Laravel Collections as values', function () {
+    $data = [
+        'count' => 2,
+        'items' => collect([
+            ['id' => 1, 'name' => 'Alice'],
+            ['id' => 2, 'name' => 'Bob'],
+        ]),
+    ];
+
+    $toon = Toon::encode($data);
+
+    expect($toon)->toContain('count: 2');
+    expect($toon)->toContain('items:');
+    expect($toon)->toContain('items[2]{id,name}:');
+    expect($toon)->toContain('1,Alice');
+    expect($toon)->toContain('2,Bob');
+    // Should NOT contain JSON
+    expect($toon)->not->toContain('[{"id"');
+});
+
+it('handles nested Collections with objects', function () {
+    $data = [
+        'total' => 2,
+        'users' => collect([
+            ['id' => 1, 'name' => 'Alice', 'meta' => ['role' => 'admin']],
+            ['id' => 2, 'name' => 'Bob', 'meta' => ['role' => 'user']],
+        ]),
+    ];
+
+    $toon = Toon::encode($data);
+
+    expect($toon)->toContain('total: 2');
+    expect($toon)->toContain('users:');
+    // Should flatten nested objects using dot notation
+    expect($toon)->toContain('id,name,meta.role');
+    expect($toon)->not->toContain('[{"id"');
+});

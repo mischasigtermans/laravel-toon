@@ -73,6 +73,12 @@ class ToonEncoder
     {
         $indent = str_repeat('  ', $depth);
 
+        if ($value instanceof \Illuminate\Contracts\Support\Arrayable) {
+            $value = $value->toArray();
+        } elseif ($value instanceof \Traversable && ! $value instanceof \DateTimeInterface) {
+            $value = iterator_to_array($value);
+        }
+
         if (is_array($value)) {
             if ($this->isSequentialArray($value)) {
                 if ($this->flattener->hasNestedObjects($value)) {

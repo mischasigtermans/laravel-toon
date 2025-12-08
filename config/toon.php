@@ -48,7 +48,7 @@ return [
     | TOON format.
     |
     | Supported styles:
-    |   - 'backslash': Escape with backslash (Hello, World → Hello\, World)
+    | - 'backslash': Escape with backslash (Hello, World → Hello\, World)
     |
     */
     'escape_style' => 'backslash',
@@ -85,7 +85,7 @@ return [
     | of their value. Useful for excluding verbose or unnecessary fields.
     |
     | Example:
-    |   'omit_keys' => ['created_at', 'updated_at', 'deleted_at']
+    | 'omit_keys' => ['created_at', 'updated_at', 'deleted_at']
     |
     */
     'omit_keys' => [],
@@ -118,9 +118,9 @@ return [
     | dates are passed through as-is. Uses PHP date format syntax.
     |
     | Examples:
-    |   'Y-m-d H:i'   → 2024-01-15 14:30
-    |   'Y-m-d'       → 2024-01-15
-    |   'd/m/Y'       → 15/01/2024
+    | 'Y-m-d H:i' → 2024-01-15 14:30
+    | 'Y-m-d' → 2024-01-15
+    | 'd/m/Y' → 15/01/2024
     |
     */
     'date_format' => null,
@@ -133,9 +133,6 @@ return [
     | Maximum length for string values. Strings exceeding this length will be
     | truncated with an ellipsis (...). When null, strings are not truncated.
     |
-    | Example with truncate_strings = 50:
-    |   'A very long description...'
-    |
     */
     'truncate_strings' => null,
 
@@ -146,9 +143,6 @@ return [
     |
     | Maximum decimal places for float values. When null, floats are passed
     | through as-is. Useful for reducing precision on monetary values etc.
-    |
-    | Example with number_precision = 2:
-    |   3.14159 → 3.14
     |
     */
     'number_precision' => null,
