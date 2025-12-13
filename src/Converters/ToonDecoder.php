@@ -65,7 +65,8 @@ class ToonDecoder
 
                 $current = &$stack[count($stack) - 1];
 
-                if (is_array($current) && array_keys($current) === range(0, count($current) - 1)) {
+                /** @phpstan-ignore function.alreadyNarrowedType */
+                if (array_is_list($current)) {
                     $current = array_merge($current, $items);
                 } else {
                     $current = $items;
