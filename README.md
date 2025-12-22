@@ -1,5 +1,8 @@
 # Laravel TOON
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/mischasigtermans/laravel-toon.svg?style=flat-square)](https://packagist.org/packages/mischasigtermans/laravel-toon)
+[![Total Downloads](https://img.shields.io/packagist/dt/mischasigtermans/laravel-toon.svg?style=flat-square)](https://packagist.org/packages/mischasigtermans/laravel-toon)
+
 Token-Optimized Object Notation encoder/decoder for Laravel with intelligent nested object handling.
 
 TOON is a compact, YAML-like format designed to reduce token usage when sending data to LLMs. This package achieves **40-60% token reduction** compared to JSON while maintaining full round-trip fidelity.
@@ -282,6 +285,15 @@ public function index(Request $request)
 ```bash
 composer test
 ```
+
+## Requirements
+
+- PHP 8.2+
+- Laravel 10, 11, or 12
+
+## Credits
+
+- [Mischa Sigtermans](https://github.com/mischasigtermans)
 
 ## License
 

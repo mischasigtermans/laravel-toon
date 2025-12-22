@@ -22,6 +22,9 @@ jobs:
       matrix:
         php: [8.4, 8.3, 8.2]
         laravel: [12.*, 11.*, 10.*]
+        exclude:
+          - php: 8.4
+            laravel: 10.*
         include:
           - laravel: 12.*
             testbench: 10.*
@@ -34,7 +37,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
