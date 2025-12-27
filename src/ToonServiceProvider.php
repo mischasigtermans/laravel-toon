@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace MischaSigtermans\Toon;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\ServiceProvider;
 use MischaSigtermans\Toon\Converters\ToonDecoder;
 use MischaSigtermans\Toon\Converters\ToonEncoder;
+use MischaSigtermans\Toon\Facades\Toon;
 
 class ToonServiceProvider extends ServiceProvider
 {
@@ -24,5 +26,10 @@ class ToonServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__.'/../config/toon.php' => config_path('toon.php'),
         ], 'toon-config');
+
+        Collection::macro(
+            'toToon',
+            fn (): string => Toon::encode($this)
+        );
     }
 }
