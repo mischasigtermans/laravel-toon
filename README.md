@@ -40,6 +40,24 @@ users:
     2,Bob,user,1
 ```
 
+### Collection Macro: `toToon`
+
+You can convert any Laravel collection directly to TOON format with the built-in `toToon` macro:
+
+```php
+$collection = collect([
+    ['id' => 1, 'name' => 'Alice'],
+    ['id' => 2, 'name' => 'Bob'],
+]);
+$toon = $collection->toToon();
+
+**Output:**
+```
+items[2]{id,name}:
+  1,Alice
+  2,Bob
+```
+
 ## Why TOON?
 
 When building MCP servers or LLM-powered applications, every token counts. JSON's verbosity wastes context window space with repeated keys and structural characters.
