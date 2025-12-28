@@ -453,3 +453,18 @@ it('handles nested Collections with objects', function () {
     expect($toon)->toContain('id,name,meta.role');
     expect($toon)->not->toContain('[{"id"');
 });
+
+it('encodes a nested Collection via toToon macro', function () {
+    $data = collect([
+        ['id' => 1, 'name' => 'Alice', 'meta' => collect(['role' => 'admin'])],
+        ['id' => 2, 'name' => 'Bob', 'meta' => collect(['role' => 'user'])],
+    ]);
+
+    $toon = $data->toToon();
+
+    expect($toon)->toContain('id,name,meta.role');
+    expect($toon)->toContain('1,Alice,admin');
+    expect($toon)->toContain('2,Bob,user');
+    // Should NOT contain JSON
+    expect($toon)->not->toContain('[{"id"');
+});
