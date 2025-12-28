@@ -50,6 +50,7 @@ $collection = collect([
     ['id' => 2, 'name' => 'Bob'],
 ]);
 $toon = $collection->toToon();
+```
 
 **Output:**
 ```

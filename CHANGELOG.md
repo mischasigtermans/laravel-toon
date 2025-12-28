@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.2] - 2025-12-28
+
+### Added
+- `toToon()` collection macro for direct Collection-to-TOON conversion (thanks [@jimmypuckett](https://github.com/jimmypuckett))
+
 ## [0.2.1] - 2025-12-08
 
 ### Fixed

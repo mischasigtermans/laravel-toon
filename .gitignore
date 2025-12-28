@@ -1,5 +1,10 @@
+/.idea/
+/.vscode/
+*.iml
 /vendor/
 /node_modules/
+/.env
+composer.lock
+/phpunit.xml
 .phpunit.result.cache
 .php-cs-fixer.cache
-composer.lock
