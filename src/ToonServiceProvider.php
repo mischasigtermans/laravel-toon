@@ -8,7 +8,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\ServiceProvider;
 use MischaSigtermans\Toon\Converters\ToonDecoder;
 use MischaSigtermans\Toon\Converters\ToonEncoder;
-use MischaSigtermans\Toon\Facades\Toon;
+use MischaSigtermans\Toon\Facades\Toon as ToonFacade;
 
 class ToonServiceProvider extends ServiceProvider
 {
@@ -29,7 +29,7 @@ class ToonServiceProvider extends ServiceProvider
 
         Collection::macro(
             'toToon',
-            fn (): string => Toon::encode($this)
+            fn (): string => ToonFacade::encode($this)
         );
     }
 }
