@@ -60,8 +60,6 @@ function toonSpecDataset(string $fixture): array
             $e->getMessage() => [
                 'input'       => '',
                 'expected'    => false,
-                'options'     => [],
-                'shouldError' => true,
             ],
         ];
     }
