@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MischaSigtermans\Toon;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\ServiceProvider;
 use MischaSigtermans\Toon\Converters\ToonDecoder;
@@ -30,6 +31,12 @@ class ToonServiceProvider extends ServiceProvider
         Collection::macro(
             'toToon',
             fn (): string => ToonFacade::encode($this)
+        );
+
+        // Register toToon macro on Builder, so $model->toToon() works via __call
+        Builder::macro(
+            'toToon',
+            fn (): string => ToonFacade::encode($this->getModel()->toArray())
         );
     }
 }

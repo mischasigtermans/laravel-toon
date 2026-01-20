@@ -469,3 +469,17 @@ it('encodes a nested Collection via toToon macro', function () {
     // Should NOT contain JSON
     expect($toon)->not->toContain('[{"id"');
 });
+
+it('encodes an Eloquent model via toToon macro', function () {
+    \Illuminate\Database\Eloquent\Model::unguard();
+
+    $user = new (new class extends \Illuminate\Database\Eloquent\Model {})([
+        'name' => 'Alice',
+        'city' => 'Amsterdam',
+    ]);
+
+    $toon = $user->toToon();
+    expect($toon)->toContain('name: Alice');
+    expect($toon)->toContain('city: Amsterdam');
+    expect($toon)->not->toContain('...');
+});
