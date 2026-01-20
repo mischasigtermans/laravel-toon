@@ -26,7 +26,7 @@ it('decodes nested objects', function () {
 });
 
 it('decodes tabular arrays', function () {
-    $toon = "items[2]{id,name}:\n  1,Alice\n  2,Bob";
+    $toon = "[2]{id,name}:\n  1,Alice\n  2,Bob";
 
     $decoded = Toon::decode($toon);
 
@@ -45,7 +45,7 @@ it('decodes booleans correctly', function () {
 });
 
 it('decodes null values', function () {
-    $toon = "items[2]{id,name}:\n  1,\n  2,Bob";
+    $toon = "[2]{id,name}:\n  1,\n  2,Bob";
 
     $decoded = Toon::decode($toon);
 

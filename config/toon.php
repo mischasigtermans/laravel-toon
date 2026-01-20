@@ -69,6 +69,42 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Key Folding
+    |--------------------------------------------------------------------------
+    |
+    | When set to 'safe', single-key nested objects are folded into dot notation.
+    | Example: {user: {name: "Alice"}} becomes user.name: Alice
+    |
+    | Supported values: 'off' (default), 'safe'
+    |
+    */
+    'key_folding' => 'off',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Key Folding Depth
+    |--------------------------------------------------------------------------
+    |
+    | Maximum depth for key folding. Only applies when key_folding is 'safe'.
+    |
+    */
+    'key_folding_depth' => null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Expand Paths
+    |--------------------------------------------------------------------------
+    |
+    | When set to 'safe', dotted keys are expanded back to nested objects
+    | during decoding. Example: user.name: Alice becomes {user: {name: "Alice"}}
+    |
+    | Supported values: 'off' (default), 'safe'
+    |
+    */
+    'expand_paths' => 'off',
+
+    /*
+    |--------------------------------------------------------------------------
     | Omit Values
     |--------------------------------------------------------------------------
     |

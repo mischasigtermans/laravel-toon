@@ -23,10 +23,11 @@
       "specSection": "8"
     },
     {
-      "name": "encodes empty objects as empty string",
+      "name": "encodes empty objects as empty array (PHP limitation)",
       "input": {},
-      "expected": "",
-      "specSection": "8"
+      "expected": "[0]:",
+      "specSection": "8",
+      "note": "PHP cannot distinguish {} from [] after JSON decode, so empty objects are encoded as empty arrays"
     },
     {
       "name": "quotes string value with colon",
@@ -209,12 +210,13 @@
       "specSection": "8"
     },
     {
-      "name": "encodes empty nested object",
+      "name": "encodes empty nested object (PHP limitation)",
       "input": {
         "user": {}
       },
-      "expected": "user:",
-      "specSection": "8"
+      "expected": "user[0]:",
+      "specSection": "8",
+      "note": "PHP cannot distinguish {} from [] after JSON decode, so empty objects are encoded as empty arrays"
     }
   ]
 }

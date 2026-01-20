@@ -19,7 +19,7 @@ class Toon
         return $this->encoder->encode($data);
     }
 
-    public function decode(string $toon): array
+    public function decode(string $toon): mixed
     {
         return $this->decoder->decode($toon);
     }

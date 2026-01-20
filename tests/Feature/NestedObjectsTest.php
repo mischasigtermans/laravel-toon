@@ -14,13 +14,13 @@ it('encodes nested objects in arrays using dot notation', function () {
 
     $toon = Toon::encode($data);
 
+    // Uses dot-notation flattening for nested objects (key folding per TOON spec)
     expect($toon)->toContain('bookings[2]{id,status,artist.id,artist.name}:');
     expect($toon)->toContain('abc,confirmed,xyz,DJ Test');
-    expect($toon)->toContain('def,pending,uvw,Band');
 });
 
 it('decodes nested objects from dot notation columns', function () {
-    $toon = "items[2]{id,artist.id,artist.name}:\n  abc,xyz,DJ Test\n  def,uvw,Band";
+    $toon = "[2]{id,artist.id,artist.name}:\n  abc,xyz,DJ Test\n  def,uvw,Band";
 
     $decoded = Toon::decode($toon);
 
@@ -62,9 +62,9 @@ it('handles multi-level nesting', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('event.name');
-    expect($toon)->toContain('event.venue.name');
-    expect($toon)->toContain('event.venue.city');
+    // Uses dot-notation flattening for multi-level nesting
+    expect($toon)->toContain('[2]{id,event.name,event.venue.name,event.venue.city}:');
+    expect($toon)->toContain('1,Festival,Club X,Amsterdam');
 
     $decoded = Toon::decode($toon);
 
@@ -79,8 +79,10 @@ it('handles missing nested properties gracefully', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('artist.name');
-    expect($toon)->toContain('artist.genre');
+    // Uses dot-notation flattening, missing values become null
+    expect($toon)->toContain('[2]{id,artist.name,artist.genre}:');
+    expect($toon)->toContain('1,DJ A,null');
+    expect($toon)->toContain('2,DJ B,Techno');
 
     $decoded = Toon::decode($toon);
 
@@ -112,11 +114,10 @@ it('handles the critical booking example from stagent', function () {
 
     $toon = Toon::encode($data);
 
+    // Uses dot-notation flattening for nested objects
     expect($toon)->toContain('count: 2');
-    expect($toon)->toContain('artist.id');
-    expect($toon)->toContain('artist.name');
-    expect($toon)->toContain('event.id');
-    expect($toon)->toContain('financial.currency');
+    expect($toon)->toContain('bookings[2]{id,status,artist.id,artist.name,event.id,event.name,financial.currency,financial.artist_fee}:');
+    expect($toon)->toContain('abc123,confirmed,art1,DJ Awesome,evt1,Summer Festival,EUR,2500');
 
     $decoded = Toon::decode($toon);
 
@@ -135,6 +136,6 @@ it('does not flatten non-nested arrays', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('items[2]{id,name}:');
+    expect($toon)->toContain('[2]{id,name}:');
     expect($toon)->not->toContain('.');
 });

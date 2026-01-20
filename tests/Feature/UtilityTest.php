@@ -33,7 +33,7 @@ it('diff handles empty data', function () {
     $diff = Toon::diff([]);
 
     expect($diff['json_chars'])->toBe(2); // '[]'
-    expect($diff['toon_chars'])->toBe(0); // empty string
+    expect($diff['toon_chars'])->toBe(4); // '[0]:'
 });
 
 it('only filters to specified keys', function () {
@@ -60,7 +60,7 @@ it('only works with nested data', function () {
 
     $toon = Toon::only($data, ['id', 'name']);
 
-    expect($toon)->toContain('items[2]{id,name}:');
+    expect($toon)->toContain('[2]{id,name}:');
     expect($toon)->toContain('1,Alice');
     expect($toon)->toContain('2,Bob');
     expect($toon)->not->toContain('email');

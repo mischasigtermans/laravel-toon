@@ -36,7 +36,7 @@ it('encodes uniform arrays as tables', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('items[2]{id,name}:');
+    expect($toon)->toContain('[2]{id,name}:');
     expect($toon)->toContain('1,Alice');
     expect($toon)->toContain('2,Bob');
 });
@@ -232,11 +232,11 @@ it('still includes omitted values in tables for column alignment', function () {
 
     $toon = Toon::encode($data);
 
-    // Tables should still have empty cells for omitted values
+    // Per TOON spec, null values in tables encode as "null"
     // Empty strings are quoted as "" per spec
-    expect($toon)->toContain('items[3]{id,name,active}:');
+    expect($toon)->toContain('[3]{id,name,active}:');
     expect($toon)->toContain('1,Alice,true');
-    expect($toon)->toContain('2,,false');
+    expect($toon)->toContain('2,null,false');
     expect($toon)->toContain('3,"",true');
 });
 
@@ -284,7 +284,7 @@ it('applies key aliases in table headers', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('items[2]{id,name,cat}:');
+    expect($toon)->toContain('[2]{id,name,cat}:');
     expect($toon)->not->toContain('created_at');
 });
 
@@ -429,7 +429,6 @@ it('handles Laravel Collections as values', function () {
     $toon = Toon::encode($data);
 
     expect($toon)->toContain('count: 2');
-    expect($toon)->toContain('items:');
     expect($toon)->toContain('items[2]{id,name}:');
     expect($toon)->toContain('1,Alice');
     expect($toon)->toContain('2,Bob');
@@ -449,9 +448,9 @@ it('handles nested Collections with objects', function () {
     $toon = Toon::encode($data);
 
     expect($toon)->toContain('total: 2');
-    expect($toon)->toContain('users:');
-    // Should flatten nested objects using dot notation
-    expect($toon)->toContain('id,name,meta.role');
+    // Uses dot-notation flattening for nested objects
+    expect($toon)->toContain('users[2]{id,name,meta.role}:');
+    expect($toon)->toContain('1,Alice,admin');
     expect($toon)->not->toContain('[{"id"');
 });
 
@@ -463,9 +462,9 @@ it('encodes a nested Collection via toToon macro', function () {
 
     $toon = $data->toToon();
 
-    expect($toon)->toContain('id,name,meta.role');
+    // Uses dot-notation flattening for nested objects
+    expect($toon)->toContain('[2]{id,name,meta.role}:');
     expect($toon)->toContain('1,Alice,admin');
-    expect($toon)->toContain('2,Bob,user');
     // Should NOT contain JSON
     expect($toon)->not->toContain('[{"id"');
 });

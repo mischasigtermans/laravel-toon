@@ -7,13 +7,13 @@ All notable changes to this project will be documented in this file.
 ### Added
 - Full [TOON v3.0 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) compliance
 - Global helper functions: `toon_encode()` and `toon_decode()`
-- Performance optimizations for encoding and decoding
-- Config injection support for encoder/decoder constructors (improved testability)
 - Spec-compliant string quoting (strings with special characters are now quoted with `"..."`)
 - Proper escape sequences within quoted strings (`\n`, `\r`, `\t`, `\"`, `\\`)
 - Delimiter support: comma (default), tab (`\t`), and pipe (`|`) via `delimiter` config option
 - Strict mode for decoding with validation errors via `strict` config option
-- Official specification test suite (65 compliance tests)
+- Key folding: collapse single-key nested objects into dot notation via `key_folding` config
+- Path expansion: expand dotted keys back to nested objects via `expand_paths` config
+- Official specification test fixtures from [toon-format/spec](https://github.com/toon-format/spec)
 - Inline primitive array format (`key[N]: a,b,c`)
 
 ### Changed
@@ -24,11 +24,12 @@ All notable changes to this project will be documented in this file.
 - Float encoding now preserves full IEEE 754 double precision (16 significant digits)
 
 ### Migration Guide
-The decoder maintains backward compatibility and will correctly parse both the old backslash-escaped format and the new quoted string format. However, if you have code that expects the old output format, be aware that:
-1. Encoded output will now use quoted strings for special characters
-2. The `escape_style` config option has been removed
-3. Republish config to get new options: `php artisan vendor:publish --tag=toon-config --force`
-4. Set `strict => false` in config if parsing legacy TOON that may have formatting issues
+The decoder maintains backward compatibility and parses both old backslash-escaped format and new quoted strings.
+
+If you have code that expects the old output format:
+1. Encoded output now uses quoted strings for special characters
+2. Republish config: `php artisan vendor:publish --tag=toon-config --force`
+3. Set `strict => false` if parsing legacy TOON with formatting issues
 
 ## [0.2.2] - 2025-12-28
 
@@ -63,11 +64,10 @@ The decoder maintains backward compatibility and will correctly parse both the o
 
 ### Added
 - Initial release
-- TOON encoding with automatic nested object flattening using dot notation
+- TOON encoding with tabular array format
 - TOON decoding with nested object reconstruction
-- Tabular array format for compact representation
 - Type preservation (int, float, bool, null)
 - Special character escaping (comma, colon, newline)
-- Configurable flatten depth and table thresholds
+- Configurable table thresholds
 - Laravel 9, 10, 11, and 12 support
 - PHP 8.2+ support
