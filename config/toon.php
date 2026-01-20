@@ -12,10 +12,6 @@ return [
     | tables for uniform arrays, or higher to only use tables for larger
     | datasets where the header overhead is worth it.
     |
-    | Example with min_rows = 2:
-    |   1 item  → id: 1\n name: Alice
-    |   2 items → items[2]{id,name}:\n  1,Alice\n  2,Bob
-    |
     */
     'min_rows_for_table' => 2,
 
@@ -28,30 +24,48 @@ return [
     | objects become dot-notation columns (e.g., author.name, author.email).
     | Objects nested deeper than this limit will be JSON-encoded as a string.
     |
-    | Example with max_depth = 2:
-    |   user.profile.name → flattened to column
-    |   user.profile.settings.theme → JSON string "[{...}]"
-    |
-    | Increase for deeply nested data structures. Decrease if your objects
-    | are very wide (many fields) to keep column headers manageable.
-    |
     */
     'max_flatten_depth' => 3,
 
     /*
     |--------------------------------------------------------------------------
-    | Escape Style
+    | Indentation
     |--------------------------------------------------------------------------
     |
-    | How to escape special characters in string values. Special characters
-    | include commas (,), colons (:), and newlines which have meaning in the
-    | TOON format.
-    |
-    | Supported styles:
-    | - 'backslash': Escape with backslash (Hello, World → Hello\, World)
+    | Number of spaces per indentation level. The TOON spec default is 2.
     |
     */
-    'escape_style' => 'backslash',
+    'indent' => 2,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Delimiter
+    |--------------------------------------------------------------------------
+    |
+    | The delimiter used to separate values in arrays and tabular data.
+    | Supported values: ',' (comma, default), "\t" (tab), '|' (pipe)
+    |
+    | Tab and pipe delimiters can reduce the need for quoting when your
+    | data contains many commas.
+    |
+    */
+    'delimiter' => ',',
+
+    /*
+    |--------------------------------------------------------------------------
+    | Strict Mode
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, the decoder will throw exceptions for:
+    | - Array length mismatches (declared vs actual row count)
+    | - Tabular row width mismatches
+    | - Invalid escape sequences
+    | - Blank lines inside array blocks
+    |
+    | Set to false for lenient parsing that ignores these issues.
+    |
+    */
+    'strict' => true,
 
     /*
     |--------------------------------------------------------------------------
@@ -67,9 +81,6 @@ return [
     |   - 'false' : Omit keys with false values
     |   - 'all'   : Shorthand for ['null', 'empty', 'false']
     |
-    | Example with omit = ['null', 'empty']:
-    |   ['name' => 'Alice', 'email' => null, 'bio' => '']  →  name: Alice
-    |
     | Note: In tabular format, these values are still represented as empty
     | cells to maintain column alignment.
     |
@@ -84,9 +95,6 @@ return [
     | Specify keys that should always be omitted from the output, regardless
     | of their value. Useful for excluding verbose or unnecessary fields.
     |
-    | Example:
-    | 'omit_keys' => ['created_at', 'updated_at', 'deleted_at']
-    |
     */
     'omit_keys' => [],
 
@@ -98,15 +106,11 @@ return [
     | Map long key names to shorter aliases to save tokens. Aliases are applied
     | to both regular key-value pairs and table column headers.
     |
-    | Uncomment or add your own aliases:
-    |
     */
     'key_aliases' => [
         // 'created_at' => 'c@',
         // 'updated_at' => 'u@',
-        // 'deleted_at' => 'd@',
         // 'description' => 'desc',
-        // 'organization_id' => 'org_id',
     ],
 
     /*
@@ -116,11 +120,6 @@ return [
     |
     | Format DateTime objects and ISO date strings using this format. When null,
     | dates are passed through as-is. Uses PHP date format syntax.
-    |
-    | Examples:
-    | 'Y-m-d H:i' → 2024-01-15 14:30
-    | 'Y-m-d' → 2024-01-15
-    | 'd/m/Y' → 15/01/2024
     |
     */
     'date_format' => null,

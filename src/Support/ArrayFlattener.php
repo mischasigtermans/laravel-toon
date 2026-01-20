@@ -33,7 +33,7 @@ class ArrayFlattener
             }
 
             foreach ($item as $value) {
-                if (is_array($value) && ! $this->isSequentialArray($value)) {
+                if (is_array($value) && ! array_is_list($value)) {
                     return true;
                 }
             }
@@ -66,7 +66,7 @@ class ArrayFlattener
         foreach ($item as $key => $value) {
             $path = $prefix === '' ? (string) $key : "{$prefix}.{$key}";
 
-            if (is_array($value) && ! $this->isSequentialArray($value) && $depth < $this->maxDepth) {
+            if (is_array($value) && ! array_is_list($value) && $depth < $this->maxDepth) {
                 $this->walkItem($value, $path, $columns, $depth + 1);
             } else {
                 $columns[] = $path;
@@ -93,10 +93,5 @@ class ArrayFlattener
         }
 
         return $data;
-    }
-
-    protected function isSequentialArray(array $arr): bool
-    {
-        return $arr === [] || array_keys($arr) === range(0, count($arr) - 1);
     }
 }

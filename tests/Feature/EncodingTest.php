@@ -62,12 +62,12 @@ it('encodes null as empty string', function () {
     expect($toon)->toContain('2,Bob');
 });
 
-it('escapes special characters', function () {
+it('quotes strings with special characters', function () {
     $data = ['message' => 'Hello, World: Test'];
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('Hello\\, World\\: Test');
+    expect($toon)->toContain('message: "Hello, World: Test"');
 });
 
 it('handles deeply nested structures', function () {
@@ -233,14 +233,15 @@ it('still includes omitted values in tables for column alignment', function () {
     $toon = Toon::encode($data);
 
     // Tables should still have empty cells for omitted values
+    // Empty strings are quoted as "" per spec
     expect($toon)->toContain('items[3]{id,name,active}:');
     expect($toon)->toContain('1,Alice,true');
     expect($toon)->toContain('2,,false');
-    expect($toon)->toContain('3,,true');
+    expect($toon)->toContain('3,"",true');
 });
 
 it('replaces keys with aliases', function () {
-    config(['toon.key_aliases' => ['created_at' => 'c@', 'updated_at' => 'u@']]);
+    config(['toon.key_aliases' => ['created_at' => 'cat', 'updated_at' => 'uat']]);
 
     $data = [
         'name' => 'Alice',
@@ -251,14 +252,14 @@ it('replaces keys with aliases', function () {
     $toon = Toon::encode($data);
 
     expect($toon)->toContain('name: Alice');
-    expect($toon)->toContain('c@: 2024-01-01');
-    expect($toon)->toContain('u@: 2024-01-02');
+    expect($toon)->toContain('cat: 2024-01-01');
+    expect($toon)->toContain('uat: 2024-01-02');
     expect($toon)->not->toContain('created_at:');
     expect($toon)->not->toContain('updated_at:');
 });
 
 it('leaves non-aliased keys unchanged', function () {
-    config(['toon.key_aliases' => ['created_at' => 'c@']]);
+    config(['toon.key_aliases' => ['created_at' => 'cat']]);
 
     $data = [
         'name' => 'Alice',
@@ -270,11 +271,11 @@ it('leaves non-aliased keys unchanged', function () {
 
     expect($toon)->toContain('name: Alice');
     expect($toon)->toContain('email: alice@example.com');
-    expect($toon)->toContain('c@: 2024-01-01');
+    expect($toon)->toContain('cat: 2024-01-01');
 });
 
 it('applies key aliases in table headers', function () {
-    config(['toon.key_aliases' => ['created_at' => 'c@', 'updated_at' => 'u@']]);
+    config(['toon.key_aliases' => ['created_at' => 'cat', 'updated_at' => 'uat']]);
 
     $data = [
         ['id' => 1, 'name' => 'Alice', 'created_at' => '2024-01-01'],
@@ -283,7 +284,7 @@ it('applies key aliases in table headers', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('items[2]{id,name,c@}:');
+    expect($toon)->toContain('items[2]{id,name,cat}:');
     expect($toon)->not->toContain('created_at');
 });
 
@@ -412,8 +413,8 @@ it('leaves dates unchanged when date_format is null', function () {
 
     $toon = Toon::encode($data);
 
-    // Should keep the original ISO format (with escaping for special chars)
-    expect($toon)->toContain('2024-01-15T14\\:30\\:00+00\\:00');
+    // Should keep the original ISO format (quoted because of colons)
+    expect($toon)->toContain('created_at: "2024-01-15T14:30:00+00:00"');
 });
 
 it('handles Laravel Collections as values', function () {

@@ -16,7 +16,7 @@ class ToonServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__.'/../config/toon.php', 'toon');
 
-        $this->app->singleton(Toon::class, function () {
+        $this->app->bind(Toon::class, function () {
             return new Toon(new ToonEncoder, new ToonDecoder);
         });
     }

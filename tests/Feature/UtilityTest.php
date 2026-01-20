@@ -94,3 +94,20 @@ it('only preserves key order from filter array', function () {
     expect($lines[1])->toContain('m: middle');
     expect($lines[2])->toContain('z: last');
 });
+
+it('toon_encode helper function works', function () {
+    $data = ['name' => 'Alice', 'age' => 30];
+
+    $toon = toon_encode($data);
+
+    expect($toon)->toContain('name: Alice');
+    expect($toon)->toContain('age: 30');
+});
+
+it('toon_decode helper function works', function () {
+    $toon = "name: Alice\nage: 30";
+
+    $data = toon_decode($toon);
+
+    expect($data)->toBe(['name' => 'Alice', 'age' => 30]);
+});

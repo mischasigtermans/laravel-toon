@@ -14,7 +14,7 @@ it('encodes nested objects in arrays using dot notation', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('items[2]{id,status,artist.id,artist.name}:');
+    expect($toon)->toContain('bookings[2]{id,status,artist.id,artist.name}:');
     expect($toon)->toContain('abc,confirmed,xyz,DJ Test');
     expect($toon)->toContain('def,pending,uvw,Band');
 });
@@ -120,6 +120,7 @@ it('handles the critical booking example from stagent', function () {
 
     $decoded = Toon::decode($toon);
 
+    expect($decoded)->toHaveKey('count');
     expect($decoded['count'])->toBe(2);
     expect($decoded['bookings'][0]['artist']['name'])->toBe('DJ Awesome');
     expect($decoded['bookings'][0]['financial']['artist_fee'])->toBe(2500);

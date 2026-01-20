@@ -2,6 +2,34 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-01-21
+
+### Added
+- Full [TOON v3.0 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) compliance
+- Global helper functions: `toon_encode()` and `toon_decode()`
+- Performance optimizations for encoding and decoding
+- Config injection support for encoder/decoder constructors (improved testability)
+- Spec-compliant string quoting (strings with special characters are now quoted with `"..."`)
+- Proper escape sequences within quoted strings (`\n`, `\r`, `\t`, `\"`, `\\`)
+- Delimiter support: comma (default), tab (`\t`), and pipe (`|`) via `delimiter` config option
+- Strict mode for decoding with validation errors via `strict` config option
+- Official specification test suite (65 compliance tests)
+- Inline primitive array format (`key[N]: a,b,c`)
+
+### Changed
+- **BREAKING**: String escaping now uses quoted strings instead of backslash escaping
+  - Before: `message: Hello\, World\: Test`
+  - After: `message: "Hello, World: Test"`
+- **BREAKING**: Removed `escape_style` config option (no longer applicable)
+- Float encoding now preserves full IEEE 754 double precision (16 significant digits)
+
+### Migration Guide
+The decoder maintains backward compatibility and will correctly parse both the old backslash-escaped format and the new quoted string format. However, if you have code that expects the old output format, be aware that:
+1. Encoded output will now use quoted strings for special characters
+2. The `escape_style` config option has been removed
+3. Republish config to get new options: `php artisan vendor:publish --tag=toon-config --force`
+4. Set `strict => false` in config if parsing legacy TOON that may have formatting issues
+
 ## [0.2.2] - 2025-12-28
 
 ### Added

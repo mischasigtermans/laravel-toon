@@ -53,7 +53,16 @@ it('decodes null values', function () {
     expect($decoded[1]['name'])->toBe('Bob');
 });
 
-it('unescapes special characters', function () {
+it('unescapes special characters from quoted strings', function () {
+    $toon = 'message: "Hello, World: Test"';
+
+    $decoded = Toon::decode($toon);
+
+    expect($decoded['message'])->toBe('Hello, World: Test');
+});
+
+it('supports legacy backslash escaping for backward compatibility', function () {
+    config(['toon.strict' => false]);
     $toon = 'message: Hello\, World\: Test';
 
     $decoded = Toon::decode($toon);

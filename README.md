@@ -3,9 +3,9 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mischasigtermans/laravel-toon.svg?style=flat-square)](https://packagist.org/packages/mischasigtermans/laravel-toon)
 [![Total Downloads](https://img.shields.io/packagist/dt/mischasigtermans/laravel-toon.svg?style=flat-square)](https://packagist.org/packages/mischasigtermans/laravel-toon)
 
-Token-Optimized Object Notation encoder/decoder for Laravel with intelligent nested object handling.
+A spec-compliant TOON (Token-Optimized Object Notation) encoder/decoder for Laravel with intelligent nested object handling.
 
-TOON is a compact, YAML-like format designed to reduce token usage when sending data to LLMs. This package achieves **40-60% token reduction** compared to JSON while maintaining full round-trip fidelity.
+TOON is a compact, YAML-like format designed to reduce token usage when sending data to LLMs. This package implements the [TOON v3.0 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) and achieves **40-60% token reduction** compared to JSON while maintaining full round-trip fidelity.
 
 ## Installation
 
@@ -38,6 +38,18 @@ users:
   items[2]{id,name,role.id,role.level}:
     1,Alice,admin,10
     2,Bob,user,1
+```
+
+### Global Helper Functions
+
+For convenience, global helper functions are available:
+
+```php
+// Encode to TOON
+$toon = toon_encode($data);
+
+// Decode back to array
+$original = toon_decode($toon);
 ```
 
 ### Collection Macro: `toToon`
@@ -154,15 +166,21 @@ $decoded = Toon::decode(Toon::encode($data));
 // Types are preserved: int, float, bool, null
 ```
 
-### Special Character Escaping
+### String Quoting (Spec-Compliant)
 
-Commas, colons, and newlines in values are automatically escaped:
+Strings containing special characters are automatically quoted per the TOON spec:
 
 ```php
 $data = ['message' => 'Hello, World: How are you?'];
 $toon = Toon::encode($data);
-// message: Hello\, World\: How are you?
+// message: "Hello, World: How are you?"
+
+$data = ['text' => "Line 1\nLine 2"];
+$toon = Toon::encode($data);
+// text: "Line 1\nLine 2"
 ```
+
+Safe strings (alphanumeric, underscores, dots) remain unquoted for minimal overhead.
 
 ## Configuration
 
@@ -183,8 +201,11 @@ return [
     // How deep to flatten nested objects (deeper = JSON string)
     'max_flatten_depth' => 3,
 
-    // Escape style for special characters (comma, colon, newline)
-    'escape_style' => 'backslash',
+    // Delimiter for array values: ',' (default), '\t' (tab), or '|' (pipe)
+    'delimiter' => ',',
+
+    // Strict mode for decoding (throws on malformed input)
+    'strict' => true,
 ];
 ```
 
@@ -299,11 +320,24 @@ public function index(Request $request)
 }
 ```
 
+## Spec Compliance
+
+This package implements the [TOON v3.0 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) and passes the official specification test suite. Key compliance features:
+
+- **String quoting**: Safe strings unquoted, special characters properly escaped (`\n`, `\r`, `\t`, `\"`, `\\`)
+- **Delimiter support**: Comma (default), tab, and pipe delimiters
+- **Array formats**: Inline primitives (`[N]: a,b,c`) and tabular objects (`[N]{fields}:`)
+- **Nested object flattening**: Dot notation for nested properties in tabular format
+- **Strict mode**: Optional validation during decoding
+- **Backward compatibility**: Decoder accepts legacy backslash escaping
+
 ## Testing
 
 ```bash
 composer test
 ```
+
+The test suite includes 118 tests covering encoding, decoding, nested object handling, and official spec compliance fixtures.
 
 ## Requirements
 
