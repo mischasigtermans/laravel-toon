@@ -59,6 +59,15 @@ items[2]{id,name}:
   2,Bob
 ```
 
+### Eloquent Model: `toToon`
+
+Eloquent models have a `toToon` method, similar to `toJson` and `toArray`:
+
+```php
+$user = User::find(1);
+$toon = $user->toToon();
+```
+
 ## Why TOON?
 
 When building MCP servers or LLM-powered applications, every token counts. JSON's verbosity wastes context window space with repeated keys and structural characters.
