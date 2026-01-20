@@ -35,6 +35,7 @@ class ToonDecoder
         $result = [];
         $stack = [&$result];
         $indentStack = [-1];
+        $hasRootContent = false;
 
         $i = 0;
         while ($i < $lineCount) {
@@ -62,19 +63,18 @@ class ToonDecoder
                 $activeDelimiter = $arrayMatch['delimiter'];
                 $inlineValues = $arrayMatch['inline'];
 
-                $isRootLevel = count($stack) === 1 && empty($result);
+                $isRootLevel = count($stack) === 1 && ! $hasRootContent;
                 $isGenericKey = $keyName === 'items' || $keyName === null;
                 $useKeyName = $keyName !== null && (! $isRootLevel || ! $isGenericKey);
+                $hasRootContent = true;
 
-                if ($inlineValues !== '' && empty($columns)) {
+                if ($inlineValues !== '' && $columns === []) {
                     $items = $this->parseRow($inlineValues, $rowCount, $activeDelimiter);
 
                     $current = &$stack[count($stack) - 1];
 
                     if ($useKeyName) {
                         $current[$keyName] = $items;
-                    } elseif (array_is_list($current)) {
-                        $current = array_merge($current, $items);
                     } else {
                         foreach ($items as $item) {
                             $current[] = $item;
@@ -120,8 +120,6 @@ class ToonDecoder
 
                     if ($useKeyName) {
                         $current[$keyName] = $items;
-                    } elseif (array_is_list($current)) {
-                        $current = array_merge($current, $items);
                     } else {
                         foreach ($items as $item) {
                             $current[] = $item;
@@ -155,11 +153,11 @@ class ToonDecoder
             return null;
         }
 
-        $keyName = isset($m[1]) && $m[1] !== '' ? $this->parseKey($m[1]) : null;
+        $keyName = $m[1] !== '' ? $this->parseKey($m[1]) : null;
         $count = (int) $m[2];
-        $delimiterMarker = $m[3] ?? '';
-        $fieldsStr = $m[4] ?? '';
-        $inlineValues = $m[5] ?? '';
+        $delimiterMarker = $m[3];
+        $fieldsStr = $m[4];
+        $inlineValues = $m[5];
 
         $delimiter = match ($delimiterMarker) {
             '\t' => "\t",
@@ -283,8 +281,9 @@ class ToonDecoder
                 continue;
             }
 
-            if ($char === '"' && ! $escape) {
+            if ($char === '"') {
                 $inQuotes = ! $inQuotes;
+                $current .= $char;
 
                 continue;
             }
@@ -323,15 +322,17 @@ class ToonDecoder
 
     protected function parseValue(string $value): mixed
     {
-        $value = trim($value);
+        $trimmed = trim($value);
 
-        if ($value === '') {
+        if ($trimmed === '') {
             return null;
         }
 
-        if (str_starts_with($value, '"') && str_ends_with($value, '"')) {
-            return $this->unescapeString(substr($value, 1, -1));
+        if (str_starts_with($trimmed, '"') && str_ends_with($trimmed, '"')) {
+            return $this->unescapeString(substr($trimmed, 1, -1));
         }
+
+        $value = $trimmed;
 
         if ($value === 'null') {
             return null;
