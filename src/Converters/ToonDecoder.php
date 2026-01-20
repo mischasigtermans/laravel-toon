@@ -84,7 +84,7 @@ class ToonDecoder
 
         $result = $this->parseBlock(-1);
 
-        if ($this->expandPaths === 'safe' && is_array($result) && ! array_is_list($result)) {
+        if ($this->expandPaths === 'safe' && ! array_is_list($result)) {
             $result = $this->expandDottedPaths($result);
         }
 
