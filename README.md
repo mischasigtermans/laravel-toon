@@ -3,7 +3,7 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mischasigtermans/laravel-toon.svg?style=flat-square)](https://packagist.org/packages/mischasigtermans/laravel-toon)
 [![Total Downloads](https://img.shields.io/packagist/dt/mischasigtermans/laravel-toon.svg?style=flat-square)](https://packagist.org/packages/mischasigtermans/laravel-toon)
 
-The most complete [TOON](https://toonformat.dev/) implementation for Laravel, and the only one with full [TOON v3.0 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) compliance.
+The most complete [TOON](https://toonformat.dev/) implementation for Laravel, and the only one with full [TOON v3.0 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) compliance. Listed as [official Laravel implementation](https://toonformat.dev/ecosystem/implementations.html).
 
 TOON (Token-Optimized Object Notation) is a compact, YAML-like format designed to reduce token usage when sending data to LLMs. This package achieves **~50% token reduction** compared to JSON while maintaining full round-trip fidelity, backed by 470 tests.
 
