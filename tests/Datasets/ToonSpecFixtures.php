@@ -69,7 +69,7 @@ function toonSpecDataset(string $fixture): array
             $result[$name] = [
                 'input' => $s->input,
                 'expected' => $expected,
-                'options' => mapSpecOptionsToConfig((array) ($s->options ?? new \stdClass)),
+                'options' => mapSpecOptionsToConfig((array) ($s->options ?? new stdClass)),
                 'shouldError' => $s->shouldError ?? false,
             ];
         }

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use Illuminate\Database\Eloquent\Model;
 use MischaSigtermans\Toon\Facades\Toon;
 
 it('encodes simple key-value pairs', function () {
@@ -311,7 +312,7 @@ it('formats DateTime objects with date_format', function () {
 
     $data = [
         'name' => 'Alice',
-        'created_at' => new \DateTime('2024-01-15 14:30:00'),
+        'created_at' => new DateTime('2024-01-15 14:30:00'),
     ];
 
     $toon = Toon::encode($data);
@@ -470,9 +471,9 @@ it('encodes a nested Collection via toToon macro', function () {
 });
 
 it('encodes an Eloquent model via toToon macro', function () {
-    \Illuminate\Database\Eloquent\Model::unguard();
+    Model::unguard();
 
-    $user = new (new class extends \Illuminate\Database\Eloquent\Model {})([
+    $user = new (new class extends Model {})([
         'name' => 'Alice',
         'city' => 'Amsterdam',
     ]);

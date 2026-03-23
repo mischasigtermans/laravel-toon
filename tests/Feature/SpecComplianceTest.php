@@ -51,7 +51,7 @@ describe('TOON Spec Compliance - Encode Primitives', function () {
 
         if ($shouldError) {
             it($name, function () use ($input) {
-                expect(fn () => Toon::encode($input))->toThrow(\Exception::class);
+                expect(fn () => Toon::encode($input))->toThrow(Exception::class);
             });
         } else {
             it($name, function () use ($input, $expected, $test) {
@@ -77,7 +77,7 @@ describe('TOON Spec Compliance - Encode Objects', function () {
 
         if ($shouldError) {
             it($name, function () use ($input) {
-                expect(fn () => Toon::encode($input))->toThrow(\Exception::class);
+                expect(fn () => Toon::encode($input))->toThrow(Exception::class);
             });
         } else {
             it($name, function () use ($input, $expected, $test) {

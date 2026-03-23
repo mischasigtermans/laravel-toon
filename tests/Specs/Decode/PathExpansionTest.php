@@ -22,7 +22,7 @@ it(
         }
 
         if ($shouldError) {
-            expect(fn () => Toon::decode($input))->toThrow(\Exception::class);
+            expect(fn () => Toon::decode($input))->toThrow(Exception::class);
         } else {
             expect(Toon::decode($input))->toEqual($expected);
         }

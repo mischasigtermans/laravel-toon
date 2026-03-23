@@ -23,7 +23,7 @@ it(
         expect(Toon::encode($input))
             ->when(
                 $shouldError,
-                fn ($e) => $e->toThrow(\Exception::class)
+                fn ($e) => $e->toThrow(Exception::class)
             )
             ->toEqual($expected);
     }

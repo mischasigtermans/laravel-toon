@@ -6,6 +6,7 @@ namespace MischaSigtermans\Toon\Converters;
 
 use Carbon\Carbon;
 use DateTimeInterface;
+use Illuminate\Contracts\Support\Arrayable;
 use Illuminate\Support\Facades\Config;
 use MischaSigtermans\Toon\Support\ArrayFlattener;
 
@@ -133,9 +134,9 @@ class ToonEncoder
     {
         $indentStr = $this->indentStr($depth);
 
-        if ($value instanceof \Illuminate\Contracts\Support\Arrayable) {
+        if ($value instanceof Arrayable) {
             $value = $value->toArray();
-        } elseif ($value instanceof \Traversable && ! $value instanceof \DateTimeInterface) {
+        } elseif ($value instanceof \Traversable && ! $value instanceof DateTimeInterface) {
             $value = iterator_to_array($value);
         }
 
@@ -418,9 +419,9 @@ class ToonEncoder
         $lines = [];
 
         foreach ($arr as $key => $val) {
-            if ($val instanceof \Illuminate\Contracts\Support\Arrayable) {
+            if ($val instanceof Arrayable) {
                 $val = $val->toArray();
-            } elseif ($val instanceof \Traversable && ! $val instanceof \DateTimeInterface) {
+            } elseif ($val instanceof \Traversable && ! $val instanceof DateTimeInterface) {
                 $val = iterator_to_array($val);
             }
 
@@ -576,9 +577,9 @@ class ToonEncoder
         $lines = [];
 
         foreach ($arr as $key => $val) {
-            if ($val instanceof \Illuminate\Contracts\Support\Arrayable) {
+            if ($val instanceof Arrayable) {
                 $val = $val->toArray();
-            } elseif ($val instanceof \Traversable && ! $val instanceof \DateTimeInterface) {
+            } elseif ($val instanceof \Traversable && ! $val instanceof DateTimeInterface) {
                 $val = iterator_to_array($val);
             }
 
@@ -898,7 +899,7 @@ class ToonEncoder
             return $this->convertObjectsToArrays($arr);
         }
 
-        if ($value instanceof \Illuminate\Contracts\Support\Arrayable) {
+        if ($value instanceof Arrayable) {
             return $this->convertObjectsToArrays($value->toArray());
         }
 
