@@ -1,6 +1,6 @@
 {
     "name": "mischasigtermans/laravel-toon",
-    "description": "Token-Optimized Object Notation encoder/decoder for Laravel with intelligent nested object handling",
+    "description": "Token-Oriented Object Notation encoder/decoder for Laravel with intelligent nested object handling",
     "keywords": [
         "laravel",
         "toon",
@@ -19,14 +19,14 @@
     ],
     "require": {
         "php": "^8.2",
-        "illuminate/support": "^10.0|^11.0|^12.0|^13.0"
+        "illuminate/support": "^12.0|^13.0"
     },
     "require-dev": {
-        "larastan/larastan": "^2.0|^3.0",
+        "larastan/larastan": "^3.0",
         "laravel/pint": "^1.20",
-        "orchestra/testbench": "^8.0|^9.0|^10.0",
-        "pestphp/pest": "^2.0|^3.0",
-        "pestphp/pest-plugin-laravel": "^2.0|^3.0"
+        "orchestra/testbench": "^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0|^5.0",
+        "pestphp/pest-plugin-laravel": "^3.0|^4.0|^5.0"
     },
     "autoload": {
         "psr-4": {

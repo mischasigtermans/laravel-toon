@@ -346,7 +346,7 @@ The test suite includes 470 tests covering encoding, decoding, nested object han
 ## Requirements
 
 - PHP 8.2+
-- Laravel 10, 11, or 12
+- Laravel 12 or 13
 
 ## Credits
 
