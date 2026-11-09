@@ -48,11 +48,15 @@ Targets the [TOON v4.1 specification](https://toonformat.dev/guide/whats-new-in-
 4. Re-encode stored TOON that used dot-notation columns, key folding or 0.x backslash escaping: decode it with 1.x, encode it with 2.0.
 5. Update decoders that read this package's output before upgrading the encoder. A 1.x decoder misreads nested field groups, keyed tables and empty arrays without an error: `tags: []` comes back as the string `"[]"`.
 
+## [1.1.2] - 2026-11-09
+
+### Fixed
+- An array of objects with a key containing `.` at any depth encodes in list form, so the key keeps its value ([#13](https://github.com/mischasigtermans/laravel-toon/issues/13)).
+
 ## [1.1.1] - 2026-11-09
 
 ### Fixed
 - An array of objects whose cells would hold a list or an object encodes in list form, so every table row decodes to what was encoded.
-- An array of objects with a key containing `.` at any depth encodes in list form, so the key keeps its value ([#13](https://github.com/mischasigtermans/laravel-toon/issues/13)).
 
 ## [1.1.0] - 2026-03-23
 
