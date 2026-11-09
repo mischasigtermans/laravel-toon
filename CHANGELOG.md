@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.1] - 2026-11-09
+
+### Fixed
+- An array of objects whose cells would hold a list or an object encodes in list form, so every table row decodes to what was encoded.
+- An array of objects with a key containing `.` at any depth encodes in list form, so the key keeps its value ([#13](https://github.com/mischasigtermans/laravel-toon/issues/13)).
+
 ## [1.1.0] - 2026-03-23
 
 ### Added
