@@ -45,7 +45,7 @@ it('decodes booleans correctly', function () {
 });
 
 it('decodes null values', function () {
-    $toon = "[2]{id,name}:\n  1,\n  2,Bob";
+    $toon = "[2]{id,name}:\n  1,null\n  2,Bob";
 
     $decoded = Toon::decode($toon);
 
@@ -53,17 +53,14 @@ it('decodes null values', function () {
     expect($decoded[1]['name'])->toBe('Bob');
 });
 
-it('unescapes special characters from quoted strings', function () {
-    $toon = 'message: "Hello, World: Test"';
+it('decodes empty cells as empty strings', function () {
+    $decoded = Toon::decode("[2]{id,name}:\n  1,\n  2,Bob");
 
-    $decoded = Toon::decode($toon);
-
-    expect($decoded['message'])->toBe('Hello, World: Test');
+    expect($decoded[0]['name'])->toBe('');
 });
 
-it('supports legacy backslash escaping for backward compatibility', function () {
-    config(['toon.strict' => false]);
-    $toon = 'message: Hello\, World\: Test';
+it('unescapes special characters from quoted strings', function () {
+    $toon = 'message: "Hello, World: Test"';
 
     $decoded = Toon::decode($toon);
 

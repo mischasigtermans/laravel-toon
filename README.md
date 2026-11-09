@@ -3,15 +3,17 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/mischasigtermans/laravel-toon.svg?style=flat-square)](https://packagist.org/packages/mischasigtermans/laravel-toon)
 [![Total Downloads](https://img.shields.io/packagist/dt/mischasigtermans/laravel-toon.svg?style=flat-square)](https://packagist.org/packages/mischasigtermans/laravel-toon)
 
-The most complete [TOON](https://toonformat.dev/) implementation for Laravel, and the only one with full [TOON v3.0 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) compliance. Listed as [official Laravel implementation](https://toonformat.dev/ecosystem/implementations.html).
+The most complete [TOON](https://toonformat.dev/) implementation for Laravel, with full [TOON v4.1 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) compliance. Listed as [official Laravel implementation](https://toonformat.dev/ecosystem/implementations.html).
 
-TOON (Token-Optimized Object Notation) is a compact, YAML-like format designed to reduce token usage when sending data to LLMs. This package achieves **~50% token reduction** compared to JSON while maintaining full round-trip fidelity, backed by 470 tests.
+TOON (Token-Oriented Object Notation) is a compact, YAML-like format designed to reduce token usage when sending data to LLMs. This package achieves **~50% token reduction** compared to JSON while maintaining full round-trip fidelity, backed by the official spec test suite.
 
 ## Installation
 
 ```bash
 composer require mischasigtermans/laravel-toon
 ```
+
+Upgrading from 1.x? The [2.0.0 changelog](CHANGELOG.md#200---2026-11-09) says what changes and how to migrate.
 
 ## Quick Start
 
@@ -65,7 +67,7 @@ $toon = $collection->toToon();
 
 **Output:**
 ```
-items[2]{id,name}:
+[2]{id,name}:
   1,Alice
   2,Bob
 ```
@@ -83,18 +85,20 @@ $toon = $user->toToon();
 
 When building MCP servers or LLM-powered applications, every token counts. JSON's verbosity wastes context window space with repeated keys and structural characters.
 
-**JSON (201 bytes):**
+**JSON (124 bytes):**
 ```json
 {"users":[{"id":1,"name":"Alice","role":"admin"},{"id":2,"name":"Bob","role":"user"},{"id":3,"name":"Carol","role":"user"}]}
 ```
 
-**TOON (62 bytes) - 69% smaller:**
+**TOON (67 bytes), 46% smaller:**
 ```
 users[3]{id,name,role}:
   1,Alice,admin
   2,Bob,user
   3,Carol,user
 ```
+
+The field names are written once, so the saving grows with the row count: 56% at 10 rows, 59% at 50.
 
 ## Benchmarks
 
@@ -116,7 +120,7 @@ Real-world benchmarks from a production application with 17,000+ records:
 
 ### Tabular Format
 
-Arrays of uniform objects with primitive values are encoded as compact tables:
+Arrays of uniform objects are encoded as compact tables:
 
 ```php
 $data = [
@@ -130,9 +134,9 @@ $toon = Toon::encode($data);
 //   2,Bob,user
 ```
 
-### List Format for Nested Objects
+### Nested Field Groups
 
-Arrays containing objects with nested properties use list format for clarity:
+Nested objects that share one shape stay in the table. The header describes the nesting, rows stay flat:
 
 ```php
 $data = [
@@ -141,18 +145,59 @@ $data = [
 ];
 
 $toon = Toon::encode($data);
+// [2]{id,author{name,email}}:
+//   1,Jane,jane@example.com
+//   2,John,john@example.com
+```
+
+Groups nest to any depth. Keys containing dots stay literal keys.
+
+### Keyed Tables
+
+Objects whose values are uniform objects collapse into a table whose rows carry their own keys:
+
+```php
+$data = [
+    'servers' => [
+        'alpha' => ['host' => 'a.example.com', 'port' => 8080],
+        'beta' => ['host' => 'b.example.com', 'port' => 9090],
+    ],
+];
+
+$toon = Toon::encode($data);
+// servers[2:]{host,port}:
+//   alpha: a.example.com,8080
+//   beta: b.example.com,9090
+```
+
+### List Format
+
+Arrays whose objects differ in shape use list format:
+
+```php
+$data = [
+    ['id' => 1, 'author' => ['name' => 'Jane']],
+    ['id' => 2, 'author' => ['name' => 'John', 'email' => 'john@example.com']],
+];
+
+$toon = Toon::encode($data);
 // [2]:
 //   - id: 1
 //     author:
 //       name: Jane
-//       email: jane@example.com
 //   - id: 2
 //     author:
 //       name: John
 //       email: john@example.com
+```
 
-$decoded = Toon::decode($toon);
-// Returns original nested structure
+### Comments
+
+The decoder skips full-line comments. The encoder never emits them.
+
+```php
+Toon::decode("# Weekly export\nusers[1]{id,name}:\n  1,Alice");
+// ['users' => [['id' => 1, 'name' => 'Alice']]]
 ```
 
 ### Type Preservation
@@ -201,8 +246,8 @@ php artisan vendor:publish --tag=toon-config
 ```php
 // config/toon.php
 return [
-    // Arrays with fewer items use regular object format instead of tables
-    'min_rows_for_table' => 2,
+    // Arrays with fewer items use list format instead of tables
+    'min_rows_for_table' => 1,
 
     // Delimiter for array values: ',' (default), '\t' (tab), or '|' (pipe)
     'delimiter' => ',',
@@ -325,15 +370,25 @@ public function index(Request $request)
 
 ## Spec Compliance
 
-This package implements the [TOON v3.0 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) and passes the official specification test suite. Key compliance features:
+Targets `toon-spec: 4.1`.
 
-- **String quoting**: Safe strings unquoted, special characters properly escaped (`\n`, `\r`, `\t`, `\"`, `\\`)
+This package implements the [TOON v4.1 specification](https://github.com/toon-format/spec/blob/main/SPEC.md) and passes the official specification test suite. Key compliance features:
+
+- **String quoting**: Safe strings unquoted, special characters properly escaped (`\n`, `\r`, `\t`, `\"`, `\\`, `\uXXXX`)
 - **Delimiter support**: Comma (default), tab, and pipe delimiters
-- **Tabular format**: Compact tables for arrays of primitive-only objects (`[N]{fields}:`)
-- **List format**: Readable structure for arrays with nested objects (`[N]:` with `- field:` items)
-- **Inline arrays**: Primitive arrays on single line (`key[N]: a,b,c`)
+- **Tabular format**: Compact tables for arrays of uniform objects, with nested field groups (`[N]{id,author{name}}:`)
+- **Keyed tables**: Objects of uniform objects (`key[N:]{fields}:`)
+- **List format**: Arrays of non-uniform objects (`[N]:` with `- field:` items)
+- **Inline arrays**: Primitive arrays on a single line (`key[N]: a,b,c`)
+- **Comments**: Full-line `#` comments are skipped when decoding
 - **Strict mode**: Optional validation during decoding
-- **Backward compatibility**: Decoder accepts legacy formats (backslash escaping, dot-notation columns)
+
+Host-type mapping:
+
+- Objects decode to associative arrays. PHP casts integer-like keys (`"42"`) to `int`, and an empty object decodes to `[]`.
+- Integers beyond `PHP_INT_MAX` decode as `float`.
+- `DateTimeInterface` encodes as an ISO 8601 string, `BackedEnum` as its value, `Arrayable`, `Traversable` and `JsonSerializable` as their array form, `Stringable` as its string.
+- In non-strict mode, each leading tab counts as one indentation level.
 
 ## Testing
 
@@ -341,7 +396,7 @@ This package implements the [TOON v3.0 specification](https://github.com/toon-fo
 composer test
 ```
 
-The test suite includes 470 tests covering encoding, decoding, nested object handling, and official spec compliance fixtures.
+The test suite runs every fixture from the official [TOON spec test suite](https://github.com/toon-format/spec/tree/main/tests) plus the package's own feature tests. Install the fixtures with `npm install` first.
 
 ## Requirements
 

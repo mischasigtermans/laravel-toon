@@ -12,7 +12,7 @@ if (! function_exists('toon_encode')) {
 }
 
 if (! function_exists('toon_decode')) {
-    function toon_decode(string $toon): array
+    function toon_decode(string $toon): mixed
     {
         return Toon::decode($toon);
     }

@@ -6,864 +6,824 @@ namespace MischaSigtermans\Toon\Converters;
 
 use Illuminate\Support\Facades\Config;
 use MischaSigtermans\Toon\Exceptions\ToonException;
-use MischaSigtermans\Toon\Support\ArrayUnflattener;
 
 class ToonDecoder
 {
-    protected ArrayUnflattener $unflattener;
-
     protected int $indent;
 
     protected bool $strict;
 
-    protected string $delimiter;
-
-    protected string $expandPaths;
-
-    protected array $quotedKeys = [];
-
+    /** @var list<array{depth: int, content: string, line: int}|null> Comment-stripped lines; null marks a blank line. */
     protected array $lines;
-
-    protected int $lineCount;
 
     protected int $pos;
 
-    public function __construct(?ArrayUnflattener $unflattener = null, ?array $config = null)
+    /** @var list<array{int, int}> Line ranges of header spans, checked for blank lines in strict mode. */
+    protected array $spans;
+
+    public function __construct(?array $config = null)
     {
         $config ??= Config::get('toon', []);
 
-        $this->unflattener = $unflattener ?? new ArrayUnflattener;
-        $this->indent = (int) ($config['indent'] ?? 2);
+        $this->indent = max(1, (int) ($config['indent'] ?? 2));
         $this->strict = (bool) ($config['strict'] ?? true);
-        $this->delimiter = (string) ($config['delimiter'] ?? ',');
-        $this->expandPaths = (string) ($config['expand_paths'] ?? 'off');
-    }
-
-    protected function getLineIndent(string $line): int
-    {
-        $trimmed = ltrim($line);
-
-        if ($trimmed === '') {
-            return 0;
-        }
-
-        $leadingWhitespace = substr($line, 0, strlen($line) - strlen($trimmed));
-        $indentSize = strlen($leadingWhitespace);
-
-        if ($this->strict && $indentSize > 0) {
-            if (str_contains($leadingWhitespace, "\t")) {
-                throw ToonException::tabInIndentation();
-            }
-
-            if ($indentSize % $this->indent !== 0) {
-                throw ToonException::invalidIndentation($indentSize, $this->indent);
-            }
-        }
-
-        return $indentSize;
     }
 
     public function decode(string $toon): mixed
     {
-        $this->lines = explode("\n", $toon);
-        $this->lineCount = count($this->lines);
+        $this->lines = $this->scan($toon);
         $this->pos = 0;
-        $this->quotedKeys = [];
+        $this->spans = [];
 
-        $hasContent = false;
-        foreach ($this->lines as $line) {
-            if (trim($line) !== '') {
-                $hasContent = true;
-                break;
-            }
-        }
+        $this->skipBlank();
 
-        if (! $hasContent) {
+        if ($this->pos >= count($this->lines)) {
             return [];
         }
 
-        $result = $this->parseBlock(-1);
-
-        if ($this->expandPaths === 'safe' && ! array_is_list($result)) {
-            $result = $this->expandDottedPaths($result);
-        }
-
-        if (array_is_list($result) && count($result) === 1) {
-            $first = $result[0];
-            if (! is_array($first)) {
-                return $first;
-            }
-        }
-
-        return $result;
-    }
-
-    protected function expandDottedPaths(array $obj): array
-    {
-        $result = [];
-
-        foreach ($obj as $key => $value) {
-            if (is_array($value) && ! array_is_list($value)) {
-                $value = $this->expandDottedPaths($value);
-            }
-
-            if ($this->shouldExpandKey((string) $key)) {
-                $this->setNestedValue($result, (string) $key, $value);
-            } else {
-                $this->mergeValue($result, (string) $key, $value);
-            }
-        }
-
-        return $result;
-    }
-
-    protected function shouldExpandKey(string $key): bool
-    {
-        if (in_array($key, $this->quotedKeys, true)) {
-            return false;
-        }
-
-        if (! str_contains($key, '.')) {
-            return false;
-        }
-
-        $segments = explode('.', $key);
-        foreach ($segments as $segment) {
-            if (! preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $segment)) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    protected function setNestedValue(array &$target, string $path, mixed $value): void
-    {
-        $segments = explode('.', $path);
-        $current = &$target;
-
-        for ($i = 0; $i < count($segments) - 1; $i++) {
-            $segment = $segments[$i];
-
-            if (! isset($current[$segment])) {
-                $current[$segment] = [];
-            } elseif (! is_array($current[$segment])) {
-                if ($this->strict) {
-                    throw ToonException::pathConflict($path);
-                }
-                $current[$segment] = [];
-            }
-
-            $current = &$current[$segment];
-        }
-
-        $lastSegment = $segments[count($segments) - 1];
-        $this->mergeValue($current, $lastSegment, $value);
-    }
-
-    protected function mergeValue(array &$target, string $key, mixed $value): void
-    {
-        if (! isset($target[$key])) {
-            $target[$key] = $value;
-
-            return;
-        }
-
-        $existing = $target[$key];
-
-        if (is_array($existing) && ! array_is_list($existing) && is_array($value) && ! array_is_list($value)) {
-            foreach ($value as $k => $v) {
-                $this->mergeValue($target[$key], (string) $k, $v);
-            }
-
-            return;
-        }
+        $result = $this->decodeRoot();
 
         if ($this->strict) {
-            throw ToonException::pathConflict($key);
-        }
-
-        $target[$key] = $value;
-    }
-
-    protected function parseBlock(int $minIndent): array
-    {
-        $result = [];
-
-        while ($this->pos < $this->lineCount) {
-            $line = $this->lines[$this->pos];
-
-            if (trim($line) === '') {
-                $this->pos++;
-
-                continue;
-            }
-
-            $indent = $this->getLineIndent($line);
-            $content = trim($line);
-
-            if ($indent <= $minIndent && $minIndent >= 0) {
-                break;
-            }
-
-            if (str_starts_with($content, '- ') || $content === '-') {
-                $itemContent = $content === '-' ? '' : substr($content, 2);
-                $this->pos++;
-                $item = $this->parseListItem($itemContent, $indent);
-                $result[] = $item;
-
-                continue;
-            }
-
-            $arrayMatch = $this->parseArrayHeader($content);
-            if ($arrayMatch !== null) {
-                $keyName = $arrayMatch['key'];
-                $rowCount = $arrayMatch['count'];
-                $columns = $arrayMatch['columns'];
-                $activeDelimiter = $arrayMatch['delimiter'];
-                $inlineValues = $arrayMatch['inline'];
-
-                $this->pos++;
-
-                if ($rowCount === 0) {
-                    $items = [];
-                } elseif ($inlineValues !== '' && $columns === []) {
-                    $items = $this->parseRow($inlineValues, $rowCount, $activeDelimiter);
-                } elseif ($columns !== []) {
-                    $items = $this->parseTabularRows($rowCount, $columns, $activeDelimiter, $indent);
-                } else {
-                    $items = $this->parseListOrRows($rowCount, $indent, $activeDelimiter);
-                }
-
-                if ($keyName !== null) {
-                    $result[$keyName] = $items;
-                } else {
-                    foreach ($items as $item) {
-                        $result[] = $item;
+            foreach ($this->spans as [$start, $end]) {
+                for ($i = $start; $i <= $end; $i++) {
+                    if ($this->lines[$i] === null) {
+                        throw ToonException::blankLineInArrayBlock();
                     }
                 }
-
-                continue;
             }
-
-            if (str_ends_with($content, ':') && ! $this->containsKeyValueSeparator($content)) {
-                $key = $this->parseKey(rtrim($content, ':'));
-                $this->pos++;
-                $result[$key] = $this->parseBlock($indent);
-
-                continue;
-            }
-
-            if ($this->containsKeyValueSeparator($content)) {
-                [$key, $value] = $this->splitKeyValue($content);
-                $result[$this->parseKey($key)] = $this->parseValue($value);
-                $this->pos++;
-
-                continue;
-            }
-
-            if ($this->strict && $minIndent >= 0) {
-                throw ToonException::missingSyntax('colon in key-value pair');
-            }
-
-            if ($this->strict && $minIndent < 0 && ! empty($result) && array_is_list($result)) {
-                $hasPrimitive = false;
-                foreach ($result as $item) {
-                    if (! is_array($item)) {
-                        $hasPrimitive = true;
-                        break;
-                    }
-                }
-                if ($hasPrimitive) {
-                    throw ToonException::invalidRootStructure();
-                }
-            }
-
-            $result[] = $this->parseValue($content);
-            $this->pos++;
         }
 
         return $result;
     }
 
-    protected function parseListItem(string $content, int $listIndent): mixed
+    /**
+     * @return list<array{depth: int, content: string, line: int}|null>
+     */
+    protected function scan(string $toon): array
     {
-        if ($content === '') {
+        if (str_starts_with($toon, "\u{FEFF}")) {
+            $toon = substr($toon, 3);
+        }
+
+        $lines = [];
+
+        foreach (explode("\n", $toon) as $i => $raw) {
+            if (str_ends_with($raw, "\r")) {
+                $raw = substr($raw, 0, -1);
+            }
+
+            $raw = rtrim($raw, ' ');
+            $spaces = strspn($raw, ' ');
+            $content = substr($raw, $spaces);
+
+            if ($content === '') {
+                $lines[] = null;
+
+                continue;
+            }
+
+            if ($content[0] === '#') {
+                continue;
+            }
+
+            $tabs = strspn($content, "\t");
+
+            if ($tabs > 0) {
+                if ($this->strict) {
+                    throw ToonException::tabInIndentation();
+                }
+
+                // Non-strict mode counts each leading tab as one indentation level.
+                $content = substr($content, $tabs);
+            }
+
+            if ($this->strict && $spaces % $this->indent !== 0) {
+                throw ToonException::invalidIndentation($spaces, $this->indent);
+            }
+
+            $lines[] = ['depth' => intdiv($spaces, $this->indent) + $tabs, 'content' => $content, 'line' => $i + 1];
+        }
+
+        return $lines;
+    }
+
+    protected function decodeRoot(): mixed
+    {
+        $first = $this->lines[$this->pos];
+
+        if ($first['depth'] === 0) {
+            $header = $this->parseHeader($first['content']);
+
+            if ($header !== null && $header['key'] === null) {
+                $this->pos++;
+                $value = $header['keyed']
+                    ? $this->keyedBody($header, 1)
+                    : $this->arrayBody($header, 1);
+                $this->assertNoTrailingContent();
+
+                return $value;
+            }
+
+            if ($first['content'] === '[]') {
+                $this->pos++;
+                $this->assertNoTrailingContent();
+
+                return [];
+            }
+        }
+
+        if ($this->countContentLines() === 1 && $this->findUnquoted($first['content'], ':') === null) {
+            $this->pos++;
+
+            return $this->parsePrimitive($first['content']);
+        }
+
+        $object = [];
+        $this->objectFields($object, 0);
+
+        return $object;
+    }
+
+    protected function assertNoTrailingContent(): void
+    {
+        $this->skipBlank();
+
+        if ($this->strict && $this->pos < count($this->lines)) {
+            throw ToonException::trailingContent($this->lines[$this->pos]['line']);
+        }
+    }
+
+    /**
+     * Read fields at exactly $depth into $object until the scope ends.
+     */
+    protected function objectFields(array &$object, int $depth): void
+    {
+        while (($line = $this->nextLineAt($depth)) !== null) {
+            $this->pos++;
+            [$key, $value] = $this->field($line['content'], $depth + 1);
+            $this->assign($object, $key, $value);
+        }
+    }
+
+    /**
+     * Parse one key-value or header line whose nested content opens at $contentDepth.
+     *
+     * @return array{string, mixed}
+     */
+    protected function field(string $content, int $contentDepth): array
+    {
+        $header = $this->parseHeader($content);
+
+        if ($header !== null) {
+            if ($header['key'] === null) {
+                if ($this->strict) {
+                    throw ToonException::misplacedHeader();
+                }
+            } else {
+                $value = $header['keyed']
+                    ? $this->keyedBody($header, $contentDepth)
+                    : $this->arrayBody($header, $contentDepth);
+
+                return [$header['key'], $value];
+            }
+        }
+
+        $colon = $this->findUnquoted($content, ':');
+
+        if ($colon === null) {
+            throw ToonException::missingSyntax('colon after key');
+        }
+
+        $key = $this->parseKey(substr($content, 0, $colon));
+        $rest = $this->trimSpaces(substr($content, $colon + 1));
+
+        if ($rest === '') {
+            return [$key, $this->nestedObject($contentDepth)];
+        }
+
+        return [$key, $rest === '[]' ? [] : $this->parsePrimitive($rest)];
+    }
+
+    protected function nestedObject(int $contentDepth): array
+    {
+        $next = $this->peek();
+
+        if ($next === null || $next['depth'] < $contentDepth) {
             return [];
         }
 
-        $arrayMatch = $this->parseArrayHeader($content);
-        if ($arrayMatch !== null) {
-            $rowCount = $arrayMatch['count'];
-            $columns = $arrayMatch['columns'];
-            $activeDelimiter = $arrayMatch['delimiter'];
-            $inlineValues = $arrayMatch['inline'];
-            $keyName = $arrayMatch['key'];
-
-            if ($rowCount === 0) {
-                $items = [];
-            } elseif ($inlineValues !== '' && $columns === []) {
-                $items = $this->parseRow($inlineValues, $rowCount, $activeDelimiter);
-            } elseif ($columns !== []) {
-                $items = $this->parseTabularRows($rowCount, $columns, $activeDelimiter, $listIndent + 2);
-            } else {
-                $items = $this->parseListOrRows($rowCount, $listIndent + 2, $activeDelimiter);
+        if ($next['depth'] > $contentDepth) {
+            if ($this->strict) {
+                throw ToonException::indentationJump($next['line']);
             }
 
-            if ($keyName !== null) {
-                $obj = [$keyName => $items];
-                $this->parseObjectFields($obj, $listIndent);
-
-                return $obj;
-            }
-
-            return $items;
+            $contentDepth = $next['depth'];
         }
 
-        if ($this->containsKeyValueSeparator($content)) {
-            [$key, $value] = $this->splitKeyValue($content);
-            $obj = [$this->parseKey($key) => $this->parseValue($value)];
-            $this->parseObjectFields($obj, $listIndent);
+        $object = [];
+        $this->objectFields($object, $contentDepth);
 
-            return $obj;
-        }
-
-        if (str_ends_with($content, ':')) {
-            $key = $this->parseKey(rtrim($content, ':'));
-            $obj = [$key => $this->parseBlock($listIndent + 2)];
-            $this->parseObjectFields($obj, $listIndent);
-
-            return $obj;
-        }
-
-        return $this->parseValue($content);
+        return $object;
     }
 
-    protected function parseObjectFields(array &$obj, int $listIndent): void
+    /**
+     * Body of a non-keyed header whose items, rows or list entries sit at $contentDepth.
+     */
+    protected function arrayBody(array $header, int $contentDepth): array
     {
-        while ($this->pos < $this->lineCount) {
-            $line = $this->lines[$this->pos];
+        if ($header['fields'] !== null) {
+            return $this->tabularRows($header, $contentDepth);
+        }
 
-            if (trim($line) === '') {
-                $this->pos++;
+        if ($header['inline'] !== '') {
+            $values = array_map(
+                fn (string $token) => $this->parsePrimitive($token),
+                $this->splitCells($header['inline'], $header['delimiter'])
+            );
 
-                continue;
-            }
+            $this->assertCount($header['length'], count($values));
 
-            $indent = $this->getLineIndent($line);
-            $content = trim($line);
+            return $values;
+        }
 
-            if ($indent <= $listIndent || str_starts_with($content, '- ') || $content === '-') {
+        return $this->listItems($header, $contentDepth);
+    }
+
+    protected function tabularRows(array $header, int $depth): array
+    {
+        $rows = [];
+        $start = null;
+
+        while (($line = $this->nextLineAt($depth)) !== null) {
+            $content = $line['content'];
+            $colon = $this->findUnquoted($content, ':');
+            $delimiter = $this->findUnquoted($content, $header['delimiter']);
+
+            if ($colon !== null && ($delimiter === null || $colon < $delimiter)) {
                 break;
             }
 
-            $arrayMatch = $this->parseArrayHeader($content);
-            if ($arrayMatch !== null) {
-                $keyName = $arrayMatch['key'];
-                $rowCount = $arrayMatch['count'];
-                $columns = $arrayMatch['columns'];
-                $activeDelimiter = $arrayMatch['delimiter'];
-                $inlineValues = $arrayMatch['inline'];
-
-                $this->pos++;
-
-                if ($rowCount === 0) {
-                    $items = [];
-                } elseif ($inlineValues !== '' && $columns === []) {
-                    $items = $this->parseRow($inlineValues, $rowCount, $activeDelimiter);
-                } elseif ($columns !== []) {
-                    $items = $this->parseTabularRows($rowCount, $columns, $activeDelimiter, $indent);
-                } else {
-                    $items = $this->parseListOrRows($rowCount, $indent, $activeDelimiter);
-                }
-
-                if ($keyName !== null) {
-                    $obj[$keyName] = $items;
-                }
-
-                continue;
-            }
-
-            if (str_ends_with($content, ':') && ! $this->containsKeyValueSeparator($content)) {
-                $key = $this->parseKey(rtrim($content, ':'));
-                $this->pos++;
-                $obj[$key] = $this->parseBlock($indent);
-
-                continue;
-            }
-
-            if ($this->containsKeyValueSeparator($content)) {
-                [$key, $value] = $this->splitKeyValue($content);
-                $obj[$this->parseKey($key)] = $this->parseValue($value);
-                $this->pos++;
-
-                continue;
-            }
-
-            break;
-        }
-    }
-
-    protected function parseTabularRows(int $rowCount, array $columns, string $delimiter, int $baseIndent): array
-    {
-        $rows = [];
-
-        for ($j = 0; $j < $rowCount && $this->pos < $this->lineCount; $j++) {
-            $rowLine = $this->lines[$this->pos];
-            $rowContent = trim($rowLine);
-
-            if ($rowContent === '') {
-                if ($this->strict) {
-                    throw ToonException::blankLineInArrayBlock();
-                }
-                $this->pos++;
-                $j--;
-
-                continue;
-            }
-
-            if ($this->strict && count($columns) > 1) {
-                $this->validateRowDelimiter($rowContent, $delimiter);
-            }
-
-            $cells = $this->parseRow($rowContent, count($columns), $delimiter);
-
-            if ($this->strict && count($cells) !== count($columns)) {
-                throw ToonException::rowWidthMismatch(count($columns), count($cells));
-            }
-
-            $rows[] = $cells;
+            $start ??= $this->pos;
             $this->pos++;
+            $rows[] = $this->materialize($header, $this->rowCells($content, $header));
         }
 
-        if ($this->strict && count($rows) !== $rowCount) {
-            throw ToonException::arrayLengthMismatch($rowCount, count($rows));
-        }
-
-        if ($this->strict && $this->pos < $this->lineCount) {
-            $nextLine = $this->lines[$this->pos];
-            $nextContent = trim($nextLine);
-            if ($nextContent !== '') {
-                $nextIndent = $this->getLineIndent($nextLine);
-                if ($nextIndent > $baseIndent) {
-                    throw ToonException::arrayLengthMismatch($rowCount, $rowCount + 1);
-                }
-            }
-        }
-
-        return $this->hasNestedColumns($columns)
-            ? $this->unflattener->unflatten($rows, $columns)
-            : $this->rowsToObjects($rows, $columns);
-    }
-
-    protected function parseListOrRows(int $rowCount, int $baseIndent, string $delimiter): array
-    {
-        // Peek to see if this is list format
-        if ($this->pos < $this->lineCount) {
-            $peekLine = $this->lines[$this->pos];
-            $peekContent = trim($peekLine);
-
-            if (str_starts_with($peekContent, '- ') || $peekContent === '-') {
-                // List format
-                return $this->parseListItems($rowCount, $baseIndent);
-            }
-        }
-
-        // Simple rows (arrays of single values)
-        $rows = [];
-        for ($j = 0; $j < $rowCount && $this->pos < $this->lineCount; $j++) {
-            $rowLine = $this->lines[$this->pos];
-            $rowContent = trim($rowLine);
-
-            if ($rowContent === '') {
-                if ($this->strict) {
-                    throw ToonException::blankLineInArrayBlock();
-                }
-                $this->pos++;
-                $j--;
-
-                continue;
-            }
-
-            $rows[] = $this->parseRow($rowContent, -1, $delimiter);
-            $this->pos++;
-        }
-
-        // If each row has exactly one cell, flatten
-        $allSingle = true;
-        foreach ($rows as $row) {
-            if (count($row) !== 1) {
-                $allSingle = false;
-                break;
-            }
-        }
-
-        if ($allSingle) {
-            return array_map(fn ($r) => $r[0], $rows);
-        }
+        $this->recordSpan($start);
+        $this->assertCount($header['length'], count($rows));
 
         return $rows;
     }
 
-    protected function parseListItems(int $expectedCount, int $baseIndent): array
+    protected function keyedBody(array $header, int $depth): array
     {
-        $items = [];
+        $object = [];
+        $count = 0;
+        $start = null;
 
-        while ($this->pos < $this->lineCount && count($items) < $expectedCount) {
-            $line = $this->lines[$this->pos];
+        while (($line = $this->nextLineAt($depth)) !== null) {
+            $colon = $this->findUnquoted($line['content'], ':');
 
-            if (trim($line) === '') {
+            if ($colon === null) {
                 if ($this->strict) {
-                    throw ToonException::blankLineInArrayBlock();
+                    throw ToonException::missingSyntax('colon in keyed entry row');
                 }
+
                 $this->pos++;
 
                 continue;
             }
 
-            $indent = $this->getLineIndent($line);
-            $content = trim($line);
+            $start ??= $this->pos;
+            $this->pos++;
+            $count++;
 
-            // List items should be at baseIndent or deeper
-            if ($indent < $baseIndent && $baseIndent >= 0) {
+            $key = $this->parseKey(substr($line['content'], 0, $colon));
+            $cells = $this->rowCells(substr($line['content'], $colon + 1), $header);
+            $this->assign($object, $key, $this->materialize($header, $cells));
+        }
+
+        $this->recordSpan($start);
+        $this->assertCount($header['length'], $count);
+
+        return $object;
+    }
+
+    protected function listItems(array $header, int $depth): array
+    {
+        $items = [];
+        $start = null;
+
+        while (($line = $this->nextLineAt($depth)) !== null) {
+            $content = $line['content'];
+
+            if (! $this->isListItem($content)) {
                 break;
             }
 
-            if (str_starts_with($content, '- ') || $content === '-') {
-                $itemContent = $content === '-' ? '' : substr($content, 2);
-                $this->pos++;
-                $items[] = $this->parseListItem($itemContent, $indent);
-            } else {
-                break;
-            }
+            $start ??= $this->pos;
+            $this->pos++;
+            $items[] = $this->listItem($this->trimSpaces(substr($content, 1)), $depth);
         }
 
-        if ($this->strict && count($items) !== $expectedCount) {
-            throw ToonException::arrayLengthMismatch($expectedCount, count($items));
-        }
-
-        // In strict mode, check for extra list items beyond declared count
-        if ($this->strict && $this->pos < $this->lineCount) {
-            $nextLine = $this->lines[$this->pos];
-            $nextContent = trim($nextLine);
-            if ($nextContent !== '' && (str_starts_with($nextContent, '- ') || $nextContent === '-')) {
-                $nextIndent = $this->getLineIndent($nextLine);
-                if ($nextIndent >= $baseIndent || $baseIndent < 0) {
-                    throw ToonException::arrayLengthMismatch($expectedCount, $expectedCount + 1);
-                }
-            }
-        }
+        $this->recordSpan($start);
+        $this->assertCount($header['length'], count($items));
 
         return $items;
     }
 
-    protected function parseArrayHeader(string $content): ?array
+    protected function listItem(string $content, int $depth): mixed
     {
-        if (! preg_match('/^([a-zA-Z_][a-zA-Z0-9_.]*|\".+\")?\[(\d+)([\t|])?\](?:\{([^\}]*)\})?:\s*(.*)$/', $content, $m)) {
-            return null;
+        if ($content === '' || $content === '[]') {
+            return [];
         }
 
-        $keyName = $m[1] !== '' ? $this->parseKey($m[1]) : null;
-        $count = (int) $m[2];
-        $delimiterMarker = $m[3];
-        $fieldsStr = $m[4];
-        $inlineValues = $m[5];
+        $header = $this->parseHeader($content);
 
-        $delimiter = match ($delimiterMarker) {
-            "\t" => "\t",
-            '|' => '|',
-            default => ',',
-        };
+        if ($header !== null && $header['key'] === null) {
+            if ($header['fields'] === null && ! $header['keyed']) {
+                return $this->arrayBody($header, $depth + 1);
+            }
 
-        $columns = [];
-        if ($fieldsStr !== '') {
-            $columns = $this->parseRow($fieldsStr, -1, $delimiter);
-            $columns = array_map(fn ($c) => is_string($c) ? $c : (string) $c, $columns);
+            if ($this->strict) {
+                throw ToonException::misplacedHeader();
+            }
         }
 
-        return [
-            'key' => $keyName,
-            'count' => $count,
-            'columns' => $columns,
-            'delimiter' => $delimiter,
-            'inline' => trim($inlineValues),
-        ];
+        if ($header === null && $this->findUnquoted($content, ':') === null) {
+            return $this->parsePrimitive($content);
+        }
+
+        // A first field on the hyphen line stands at $depth + 1; its own content opens at $depth + 2.
+        [$key, $value] = $this->field($content, $depth + 2);
+        $object = [$key => $value];
+        $this->objectFields($object, $depth + 1);
+
+        return $object;
     }
 
-    protected function findUnquoted(string $content, string $needle): int|false
+    /**
+     * @return list<string>
+     */
+    protected function rowCells(string $content, array $header): array
     {
-        $inQuotes = false;
-        $escape = false;
-        $len = strlen($content);
-        $needleLen = strlen($needle);
+        $content = $this->trimSpaces($content);
 
-        for ($i = 0; $i < $len; $i++) {
-            $char = $content[$i];
+        return $content === '' ? [] : $this->splitCells($content, $header['delimiter']);
+    }
 
-            if ($escape) {
-                $escape = false;
+    /**
+     * Walk the field tree depth-first, consuming one cell per leaf field.
+     */
+    protected function materialize(array $header, array $cells): array
+    {
+        $index = 0;
+
+        if ($this->strict && count($cells) !== $header['leaves']) {
+            throw ToonException::rowWidthMismatch($header['leaves'], count($cells));
+        }
+
+        return $this->materializeGroup($header['fields'], $cells, $index);
+    }
+
+    protected function materializeGroup(array $fields, array $cells, int &$index): array
+    {
+        $object = [];
+
+        foreach ($fields as [$name, $children]) {
+            if ($children !== null) {
+                $object[$name] = $this->materializeGroup($children, $cells, $index);
 
                 continue;
             }
 
-            if ($char === '\\') {
-                $escape = true;
-
-                continue;
+            if (array_key_exists($index, $cells)) {
+                $object[$name] = $this->parsePrimitive($cells[$index]);
             }
 
-            if ($char === '"') {
-                $inQuotes = ! $inQuotes;
-
-                continue;
-            }
-
-            if (! $inQuotes && substr($content, $i, $needleLen) === $needle) {
-                return $i;
-            }
+            $index++;
         }
 
-        return false;
+        return $object;
     }
 
-    protected function containsKeyValueSeparator(string $content): bool
+    protected function leafCount(array $fields): int
     {
-        if (! str_contains($content, ': ')) {
-            return false;
+        $count = 0;
+
+        foreach ($fields as [, $children]) {
+            $count += $children === null ? 1 : $this->leafCount($children);
         }
 
-        return $this->findUnquoted($content, ': ') !== false;
+        return $count;
     }
 
-    protected function splitKeyValue(string $content): array
+    /**
+     * Parse an array or keyed header. Returns null when the line is not a header;
+     * throws in strict mode when it is a malformed one.
+     *
+     * @return array{key: ?string, length: int, keyed: bool, delimiter: string, fields: ?array, inline: string, leaves: int}|null
+     */
+    protected function parseHeader(string $content): ?array
     {
-        $pos = $this->findUnquoted($content, ': ');
+        $key = null;
 
-        if ($pos === false) {
-            return [$content, ''];
-        }
+        if ($content[0] === '"') {
+            $end = $this->closingQuote($content, 0);
 
-        return [substr($content, 0, $pos), substr($content, $pos + 2)];
-    }
-
-    protected function validateRowDelimiter(string $row, string $expectedDelimiter): void
-    {
-        $otherDelimiters = [',', "\t", '|'];
-        $hasExpected = $this->containsUnquotedDelimiter($row, $expectedDelimiter);
-
-        foreach ($otherDelimiters as $other) {
-            if ($other === $expectedDelimiter) {
-                continue;
+            if ($end === null || ($content[$end + 1] ?? '') !== '[') {
+                return null;
             }
 
-            if ($this->containsUnquotedDelimiter($row, $other)) {
-                if (! $hasExpected) {
-                    $expectedName = $expectedDelimiter === "\t" ? 'tab' : $expectedDelimiter;
-                    $actualName = $other === "\t" ? 'tab' : $other;
-                    throw ToonException::delimiterMismatch($expectedName, $actualName);
+            $key = $this->unescape(substr($content, 1, $end - 1));
+            $bracket = $end + 1;
+        } else {
+            $bracket = $this->findUnquoted($content, '[');
+            $colon = $this->findUnquoted($content, ':');
+
+            if ($bracket === null || $colon === null || $colon < $bracket) {
+                return null;
+            }
+
+            if ($bracket > 0) {
+                $key = substr($content, 0, $bracket);
+
+                if ($key !== rtrim($key, " \t")) {
+                    return $this->malformedHeader();
                 }
             }
         }
+
+        $close = strpos($content, ']', $bracket);
+
+        if ($close === false || ! preg_match('/^(0|[1-9]\d*)(:)?([\t|])?$/', substr($content, $bracket + 1, $close - $bracket - 1), $m)) {
+            return $this->malformedHeader();
+        }
+
+        $delimiter = ($m[3] ?? '') === '' ? ',' : $m[3];
+        $keyed = ($m[2] ?? '') === ':';
+        $pos = $close + 1;
+        $fields = null;
+
+        if (($content[$pos] ?? '') === '{') {
+            $fields = $this->parseFieldGroup($content, $pos, $delimiter);
+
+            if ($fields === null) {
+                return $this->malformedHeader();
+            }
+        }
+
+        if (($content[$pos] ?? '') !== ':') {
+            return $this->malformedHeader();
+        }
+
+        if ($keyed && $fields === null) {
+            return $this->malformedHeader();
+        }
+
+        $inline = $this->trimSpaces(substr($content, $pos + 1));
+
+        if ($fields !== null && $inline !== '') {
+            return $this->malformedHeader();
+        }
+
+        return [
+            'key' => $key,
+            'length' => (int) $m[1],
+            'keyed' => $keyed,
+            'delimiter' => $delimiter,
+            'fields' => $fields,
+            'inline' => $inline,
+            'leaves' => $fields === null ? 0 : $this->leafCount($fields),
+        ];
     }
 
-    protected function containsUnquotedDelimiter(string $content, string $delimiter): bool
+    protected function malformedHeader(): null
     {
-        return $this->findUnquoted($content, $delimiter) !== false;
+        if ($this->strict) {
+            throw ToonException::malformedHeader();
+        }
+
+        return null;
     }
 
-    protected function parseRow(string $row, int $expectedCount, string $delimiter = ','): array
+    /**
+     * Parse `{a,b{c,d}}` starting at $pos, leaving $pos just past the closing brace.
+     *
+     * @return list<array{string, ?array}>|null
+     */
+    protected function parseFieldGroup(string $content, int &$pos, string $delimiter): ?array
+    {
+        $pos++;
+        $fields = [];
+        $names = [];
+        $len = strlen($content);
+
+        while (true) {
+            $start = $pos;
+
+            if (($content[$pos] ?? '') === '"') {
+                $end = $this->closingQuote($content, $pos);
+
+                if ($end === null) {
+                    throw ToonException::unterminatedString();
+                }
+
+                $name = $this->unescape(substr($content, $pos + 1, $end - $pos - 1));
+                $pos = $end + 1;
+            } else {
+                while ($pos < $len && ! in_array($content[$pos], ['{', '}', $delimiter], true)) {
+                    $pos++;
+                }
+
+                $name = $this->trimSpaces(substr($content, $start, $pos - $start));
+
+                if ($name === '' || strpbrk($name, ",\t|:[]") !== false) {
+                    return null;
+                }
+            }
+
+            $children = null;
+
+            if (($content[$pos] ?? '') === '{') {
+                $children = $this->parseFieldGroup($content, $pos, $delimiter);
+
+                if ($children === null) {
+                    return null;
+                }
+            }
+
+            if (isset($names[$name]) && $this->strict) {
+                throw ToonException::duplicateKey($name);
+            }
+
+            $names[$name] = true;
+            $fields[] = [$name, $children];
+
+            $char = $content[$pos] ?? '';
+
+            if ($char === '}') {
+                $pos++;
+
+                return $fields;
+            }
+
+            if ($char !== $delimiter) {
+                return null;
+            }
+
+            $pos++;
+        }
+    }
+
+    protected function assign(array &$object, string $key, mixed $value): void
+    {
+        if ($this->strict && array_key_exists($key, $object)) {
+            throw ToonException::duplicateKey($key);
+        }
+
+        $object[$key] = $value;
+    }
+
+    protected function assertCount(int $declared, int $actual): void
+    {
+        if ($this->strict && $declared !== $actual) {
+            throw ToonException::arrayLengthMismatch($declared, $actual);
+        }
+    }
+
+    /**
+     * The next line at exactly $depth, handling deeper orphan lines on the way; null once the scope ends.
+     *
+     * @return array{depth: int, content: string, line: int}|null
+     */
+    protected function nextLineAt(int $depth): ?array
+    {
+        while (($line = $this->peek()) !== null && $line['depth'] >= $depth) {
+            if ($line['depth'] === $depth) {
+                return $line;
+            }
+
+            $this->orphan($line);
+        }
+
+        return null;
+    }
+
+    protected function isListItem(string $content): bool
+    {
+        return $content === '-' || str_starts_with($content, '- ');
+    }
+
+    protected function orphan(array $line): void
+    {
+        $content = $line['content'];
+        $isScalar = ! $this->isListItem($content) && $this->findUnquoted($content, ':') === null;
+
+        if ($this->strict || $isScalar) {
+            throw ToonException::indentationJump($line['line']);
+        }
+
+        $this->pos++;
+    }
+
+    protected function recordSpan(?int $start): void
+    {
+        if ($start !== null) {
+            $this->spans[] = [$start, $this->lastContentLine()];
+        }
+    }
+
+    protected function lastContentLine(): int
+    {
+        $i = $this->pos - 1;
+
+        while ($this->lines[$i] === null) {
+            $i--;
+        }
+
+        return $i;
+    }
+
+    /**
+     * @return array{depth: int, content: string, line: int}|null
+     */
+    protected function peek(): ?array
+    {
+        $this->skipBlank();
+
+        return $this->lines[$this->pos] ?? null;
+    }
+
+    protected function skipBlank(): void
+    {
+        while ($this->pos < count($this->lines) && $this->lines[$this->pos] === null) {
+            $this->pos++;
+        }
+    }
+
+    protected function countContentLines(): int
+    {
+        return count(array_filter($this->lines));
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function splitCells(string $content, string $delimiter): array
     {
         $cells = [];
-        $current = '';
-        $inQuotes = false;
-        $escape = false;
-        $len = strlen($row);
+        $start = 0;
 
-        for ($i = 0; $i < $len; $i++) {
-            $char = $row[$i];
-
-            if ($escape) {
-                // Preserve the backslash for parseValue to handle escape sequences
-                $current .= '\\'.$char;
-                $escape = false;
-
-                continue;
-            }
-
-            if ($char === '\\') {
-                $escape = true;
-
-                continue;
-            }
-
-            if ($char === '"') {
-                $inQuotes = ! $inQuotes;
-                $current .= $char;
-
-                continue;
-            }
-
-            if (! $inQuotes && $char === $delimiter) {
-                $cells[] = $this->parseValue($current);
-                $current = '';
-
-                continue;
-            }
-
-            $current .= $char;
+        while (($end = $this->findUnquoted($content, $delimiter, $start)) !== null) {
+            $cells[] = $this->trimSpaces(substr($content, $start, $end - $start));
+            $start = $end + 1;
         }
 
-        if ($inQuotes) {
-            throw ToonException::unterminatedString();
-        }
-
-        $cells[] = $this->parseValue($current);
-
-        if ($expectedCount > 0) {
-            if ($this->strict && count($cells) !== $expectedCount) {
-                throw ToonException::arrayLengthMismatch($expectedCount, count($cells));
-            }
-
-            while (count($cells) < $expectedCount) {
-                $cells[] = null;
-            }
-        }
+        $cells[] = $this->trimSpaces(substr($content, $start));
 
         return $cells;
     }
 
-    protected function parseKey(string $key): string
+    protected function findUnquoted(string $content, string $needle, int $offset = 0): ?int
     {
-        $key = trim($key);
+        $inQuotes = false;
+        $len = strlen($content);
 
-        if (str_starts_with($key, '"') && str_ends_with($key, '"')) {
-            $unquoted = $this->unescapeString(substr($key, 1, -1));
-            $this->quotedKeys[] = $unquoted;
+        for ($i = $offset; $i < $len; $i++) {
+            $char = $content[$i];
 
-            return $unquoted;
-        }
+            if ($inQuotes && $char === '\\') {
+                $i++;
 
-        return $key;
-    }
-
-    protected function parseValue(string $value): mixed
-    {
-        $trimmed = trim($value);
-
-        if ($trimmed === '') {
-            return null;
-        }
-
-        if (str_starts_with($trimmed, '"')) {
-            if (! str_ends_with($trimmed, '"') || strlen($trimmed) < 2) {
-                throw ToonException::unterminatedString();
+                continue;
             }
 
-            return $this->unescapeString(substr($trimmed, 1, -1));
-        }
-
-        $value = $trimmed;
-
-        if ($value === 'null') {
-            return null;
-        }
-
-        if ($value === 'true') {
-            return true;
-        }
-
-        if ($value === 'false') {
-            return false;
-        }
-
-        if ($this->isNumeric($value)) {
-            // Numbers with decimal points or exponents should be floats
-            if (str_contains($value, '.') || stripos($value, 'e') !== false) {
-                return (float) $value;
+            if ($char === '"') {
+                $inQuotes = ! $inQuotes;
+            } elseif (! $inQuotes && $char === $needle) {
+                return $i;
             }
-
-            return (int) $value;
         }
 
-        return $this->unescapeLegacy($value);
+        return null;
     }
 
-    protected function isNumeric(string $value): bool
+    protected function closingQuote(string $content, int $open): ?int
     {
-        if (preg_match('/^0\d+$/', $value)) {
-            return false;
+        $len = strlen($content);
+
+        for ($i = $open + 1; $i < $len; $i++) {
+            if ($content[$i] === '\\') {
+                $i++;
+            } elseif ($content[$i] === '"') {
+                return $i;
+            }
         }
 
-        return (bool) preg_match('/^-?\d+(?:\.\d+)?(?:e[+-]?\d+)?$/i', $value);
+        return null;
     }
 
-    protected function unescapeString(string $s): string
+    protected function parseKey(string $token): string
+    {
+        $token = $this->trimSpaces($token);
+
+        if (str_starts_with($token, '"')) {
+            return $this->parseQuoted($token);
+        }
+
+        return $token;
+    }
+
+    protected function parsePrimitive(string $token): mixed
+    {
+        $token = $this->trimSpaces($token);
+
+        if (str_starts_with($token, '"')) {
+            return $this->parseQuoted($token);
+        }
+
+        return match (true) {
+            $token === 'null' => null,
+            $token === 'true' => true,
+            $token === 'false' => false,
+            $this->isNumber($token) => $this->toNumber($token),
+            default => $token,
+        };
+    }
+
+    protected function parseQuoted(string $token): string
+    {
+        $end = $this->closingQuote($token, 0);
+
+        if ($end === null) {
+            throw ToonException::unterminatedString();
+        }
+
+        if ($end !== strlen($token) - 1) {
+            throw ToonException::contentAfterQuote();
+        }
+
+        return $this->unescape(substr($token, 1, -1));
+    }
+
+    protected function isNumber(string $token): bool
+    {
+        return (bool) preg_match('/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:e[+-]?\d+)?$/i', $token);
+    }
+
+    protected function toNumber(string $token): int|float
+    {
+        if (preg_match('/^-?\d+$/', $token)) {
+            $int = filter_var($token, FILTER_VALIDATE_INT);
+
+            if ($int !== false) {
+                return $int;
+            }
+        }
+
+        $float = (float) $token;
+
+        return $float == 0.0 ? 0 : $float;
+    }
+
+    protected function unescape(string $s): string
     {
         if (! str_contains($s, '\\')) {
             return $s;
         }
 
-        $result = '';
-        $escape = false;
-        $len = strlen($s);
+        return preg_replace_callback('/\\\\(u(.{0,4})|.?)/su', function (array $m) {
+            $escape = $m[1];
 
-        for ($i = 0; $i < $len; $i++) {
-            $char = $s[$i];
+            if ($escape !== '' && $escape[0] === 'u') {
+                $hex = $m[2];
 
-            if ($escape) {
-                $result .= match ($char) {
-                    'n' => "\n",
-                    'r' => "\r",
-                    't' => "\t",
-                    '"' => '"',
-                    '\\' => '\\',
-                    default => $this->strict
-                        ? throw ToonException::invalidEscapeSequence($char)
-                        : $char,
-                };
-                $escape = false;
+                if (! preg_match('/^[0-9a-f]{4}$/i', $hex)) {
+                    throw ToonException::invalidEscapeSequence($escape);
+                }
 
-                continue;
+                $code = hexdec($hex);
+
+                if ($code >= 0xD800 && $code <= 0xDFFF) {
+                    throw ToonException::invalidEscapeSequence($escape);
+                }
+
+                return mb_chr((int) $code, 'UTF-8');
             }
 
-            if ($char === '\\') {
-                $escape = true;
-
-                continue;
-            }
-
-            $result .= $char;
-        }
-
-        return $result;
+            return match ($escape) {
+                'n' => "\n",
+                'r' => "\r",
+                't' => "\t",
+                '"' => '"',
+                '\\' => '\\',
+                default => throw ToonException::invalidEscapeSequence($escape),
+            };
+        }, $s);
     }
 
-    protected function unescapeLegacy(string $value): string
+    protected function trimSpaces(string $s): string
     {
-        $value = str_replace('\\n', "\n", $value);
-        $value = str_replace('\\,', ',', $value);
-        $value = str_replace('\\:', ':', $value);
-        $value = str_replace('\\\\', '\\', $value);
-
-        return $value;
-    }
-
-    protected function hasNestedColumns(array $columns): bool
-    {
-        foreach ($columns as $col) {
-            if (str_contains($col, '.')) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    protected function rowsToObjects(array $rows, array $columns): array
-    {
-        return array_map(
-            fn (array $row) => array_combine($columns, $row) ?: [],
-            $rows
-        );
+        return trim($s, ' ');
     }
 }

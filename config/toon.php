@@ -7,25 +7,12 @@ return [
     | Minimum Rows for Table Format
     |--------------------------------------------------------------------------
     |
-    | Arrays with fewer items than this will be encoded as regular YAML-like
-    | objects instead of the compact tabular format. Set to 1 to always use
-    | tables for uniform arrays, or higher to only use tables for larger
-    | datasets where the header overhead is worth it.
+    | Arrays of uniform objects with fewer items than this use list form
+    | instead of the tabular form. The TOON spec requires tabular form for
+    | every uniform array, so values above 1 produce non-conforming output.
     |
     */
-    'min_rows_for_table' => 2,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Maximum Flatten Depth
-    |--------------------------------------------------------------------------
-    |
-    | How many levels deep to flatten nested objects within arrays. Nested
-    | objects become dot-notation columns (e.g., author.name, author.email).
-    | Objects nested deeper than this limit will be JSON-encoded as a string.
-    |
-    */
-    'max_flatten_depth' => 3,
+    'min_rows_for_table' => 1,
 
     /*
     |--------------------------------------------------------------------------
@@ -57,51 +44,15 @@ return [
     |--------------------------------------------------------------------------
     |
     | When enabled, the decoder will throw exceptions for:
-    | - Array length mismatches (declared vs actual row count)
+    | - Array length mismatches (declared vs actual item count)
     | - Tabular row width mismatches
-    | - Invalid escape sequences
-    | - Blank lines inside array blocks
+    | - Malformed headers and duplicate keys
+    | - Indentation errors and blank lines inside array blocks
     |
     | Set to false for lenient parsing that ignores these issues.
     |
     */
     'strict' => true,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Key Folding
-    |--------------------------------------------------------------------------
-    |
-    | When set to 'safe', single-key nested objects are folded into dot notation.
-    | Example: {user: {name: "Alice"}} becomes user.name: Alice
-    |
-    | Supported values: 'off' (default), 'safe'
-    |
-    */
-    'key_folding' => 'off',
-
-    /*
-    |--------------------------------------------------------------------------
-    | Key Folding Depth
-    |--------------------------------------------------------------------------
-    |
-    | Maximum depth for key folding. Only applies when key_folding is 'safe'.
-    |
-    */
-    'key_folding_depth' => null,
-
-    /*
-    |--------------------------------------------------------------------------
-    | Expand Paths
-    |--------------------------------------------------------------------------
-    |
-    | When set to 'safe', dotted keys are expanded back to nested objects
-    | during decoding. Example: user.name: Alice becomes {user: {name: "Alice"}}
-    |
-    | Supported values: 'off' (default), 'safe'
-    |
-    */
-    'expand_paths' => 'off',
 
     /*
     |--------------------------------------------------------------------------
@@ -117,8 +68,8 @@ return [
     |   - 'false' : Omit keys with false values
     |   - 'all'   : Shorthand for ['null', 'empty', 'false']
     |
-    | Note: In tabular format, these values are still represented as empty
-    | cells to maintain column alignment.
+    | Note: In tabular format, these values keep their cell (null, "",
+    | false) to maintain column alignment.
     |
     */
     'omit' => [],
@@ -176,8 +127,8 @@ return [
     | Number Precision
     |--------------------------------------------------------------------------
     |
-    | Maximum decimal places for float values. When null, floats are passed
-    | through as-is. Useful for reducing precision on monetary values etc.
+    | Maximum decimal places for float values. Rounded values keep canonical
+    | form, so 99.5 stays 99.5, not 99.50. When null, floats pass through as-is.
     |
     */
     'number_precision' => null,

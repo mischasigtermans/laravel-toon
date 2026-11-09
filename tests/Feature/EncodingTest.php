@@ -357,8 +357,7 @@ it('limits number precision for floats', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('pi: 3.14');
-    expect($toon)->toContain('price: 100.00');
+    expect($toon)->toBe("pi: 3.14\nprice: 100");
 });
 
 it('preserves integers when number_precision is set', function () {
@@ -371,8 +370,11 @@ it('preserves integers when number_precision is set', function () {
 
     $toon = Toon::encode($data);
 
-    expect($toon)->toContain('count: 42');
-    expect($toon)->toContain('price: 99.50');
+    expect($toon)->toBe("count: 42\nprice: 99.5");
+});
+
+it('encodes backed enums as their value', function () {
+    expect(Toon::encode(['status' => ToonTestStatus::Active]))->toBe('status: active');
 });
 
 it('truncates long strings', function () {
@@ -449,8 +451,7 @@ it('handles nested Collections with objects', function () {
     $toon = Toon::encode($data);
 
     expect($toon)->toContain('total: 2');
-    // Uses dot-notation flattening for nested objects
-    expect($toon)->toContain('users[2]{id,name,meta.role}:');
+    expect($toon)->toContain('users[2]{id,name,meta{role}}:');
     expect($toon)->toContain('1,Alice,admin');
     expect($toon)->not->toContain('[{"id"');
 });
@@ -463,8 +464,7 @@ it('encodes a nested Collection via toToon macro', function () {
 
     $toon = $data->toToon();
 
-    // Uses dot-notation flattening for nested objects
-    expect($toon)->toContain('[2]{id,name,meta.role}:');
+    expect($toon)->toContain('[2]{id,name,meta{role}}:');
     expect($toon)->toContain('1,Alice,admin');
     // Should NOT contain JSON
     expect($toon)->not->toContain('[{"id"');
@@ -483,3 +483,8 @@ it('encodes an Eloquent model via toToon macro', function () {
     expect($toon)->toContain('city: Amsterdam');
     expect($toon)->not->toContain('...');
 });
+
+enum ToonTestStatus: string
+{
+    case Active = 'active';
+}

@@ -10,7 +10,7 @@ class ToonException extends RuntimeException
 {
     public static function arrayLengthMismatch(int $declared, int $actual): self
     {
-        return new self("Array length mismatch: declared {$declared} rows, got {$actual}");
+        return new self("Array length mismatch: declared {$declared} items, got {$actual}");
     }
 
     public static function rowWidthMismatch(int $expected, int $actual): self
@@ -48,18 +48,33 @@ class ToonException extends RuntimeException
         return new self("Missing {$expected}");
     }
 
-    public static function invalidRootStructure(): self
+    public static function malformedHeader(): self
     {
-        return new self('Multiple primitives at root level in strict mode');
+        return new self('Malformed array header');
     }
 
-    public static function delimiterMismatch(string $expected, string $actual): self
+    public static function misplacedHeader(): self
     {
-        return new self("Delimiter mismatch: header declares '{$expected}' but row uses '{$actual}'");
+        return new self('Keyless header outside its valid position');
     }
 
-    public static function pathConflict(string $path): self
+    public static function duplicateKey(string $key): self
     {
-        return new self("Path conflict at '{$path}'");
+        return new self("Duplicate key '{$key}'");
+    }
+
+    public static function indentationJump(int $line): self
+    {
+        return new self("Line {$line} is indented deeper than its enclosing scope");
+    }
+
+    public static function trailingContent(int $line): self
+    {
+        return new self("Unexpected content on line {$line} after the root value");
+    }
+
+    public static function contentAfterQuote(): self
+    {
+        return new self('Unexpected characters after closing quote');
     }
 }

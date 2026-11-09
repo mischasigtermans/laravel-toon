@@ -33,7 +33,7 @@ it('diff handles empty data', function () {
     $diff = Toon::diff([]);
 
     expect($diff['json_chars'])->toBe(2); // '[]'
-    expect($diff['toon_chars'])->toBe(4); // '[0]:'
+    expect($diff['toon_chars'])->toBe(2); // '[]'
 });
 
 it('only filters to specified keys', function () {
@@ -110,4 +110,9 @@ it('toon_decode helper function works', function () {
     $data = toon_decode($toon);
 
     expect($data)->toBe(['name' => 'Alice', 'age' => 30]);
+});
+
+it('toon_decode helper returns root primitives', function () {
+    expect(toon_decode('42'))->toBe(42);
+    expect(toon_decode('hello'))->toBe('hello');
 });
