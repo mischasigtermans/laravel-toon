@@ -181,3 +181,24 @@ it('keeps flattening nested objects that hold only scalars', function () {
 
     expect(Toon::encode($data))->toBe("nodes[2]{id,body.k,body.v}:\n  1,1,null\n  2,2,x");
 });
+
+it('round-trips arrays of objects whose keys contain a dot', function (array $data) {
+    expect(Toon::decode(Toon::encode($data)))->toBe($data);
+})->with([
+    'a dotted key in a nested object' => [[
+        ['dimensions' => ['campaign.name' => 'A'], 'metrics' => ['sessions' => 100]],
+        ['dimensions' => ['campaign.name' => 'B'], 'metrics' => ['sessions' => 50]],
+    ]],
+    'a dotted key two levels down' => [['rows' => [
+        ['id' => 1, 'meta' => ['a' => ['b.c' => 'x'], 'd' => 'y']],
+        ['id' => 2, 'meta' => ['a' => ['b.c' => 'z'], 'd' => 'w']],
+    ]]],
+    'a dotted key beside a nested object' => [[
+        ['council.budget' => 5, 'body' => ['k' => 1]],
+        ['council.budget' => 6, 'body' => ['k' => 2]],
+    ]],
+    'a dotted key in a flat table' => [['settings' => [
+        ['council.budget' => 5, 'on' => true],
+        ['council.budget' => 6, 'on' => false],
+    ]]],
+]);

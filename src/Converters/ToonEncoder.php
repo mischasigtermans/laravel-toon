@@ -853,7 +853,7 @@ class ToonEncoder
         $firstTypes = null;
 
         foreach ($arr as $item) {
-            if (! is_array($item) || array_is_list($item)) {
+            if (! is_array($item) || array_is_list($item) || $this->hasDottedKey($item)) {
                 return false;
             }
 
@@ -876,6 +876,20 @@ class ToonEncoder
         }
 
         return true;
+    }
+
+    /**
+     * The decoder splits every dotted column name into nested keys, so an object with a dotted key at any depth stays out of a table.
+     */
+    protected function hasDottedKey(array $object): bool
+    {
+        foreach ($object as $key => $val) {
+            if (str_contains((string) $key, '.') || (is_array($val) && ! array_is_list($val) && $this->hasDottedKey($val))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function isArrayOfUniformPrimitiveObjects(array $arr): bool
