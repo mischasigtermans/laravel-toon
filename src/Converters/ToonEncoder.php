@@ -162,9 +162,8 @@ class ToonEncoder
                     return $this->arrayOfObjectsToToon($value, $depth, $parentKey);
                 }
 
-                if ($this->isArrayOfUniformObjects($value) && $this->flattener->hasNestedObjects($value)) {
-                    $flattened = $this->flattener->flatten($value);
-
+                $flattened = $this->flattenToTable($value);
+                if ($flattened !== null) {
                     return $this->flattenedToToon($flattened, $depth, $parentKey);
                 }
 
@@ -179,6 +178,30 @@ class ToonEncoder
         }
 
         return $indentStr.$this->encodePrimitive($value);
+    }
+
+    /**
+     * A table cell holds only a scalar: a list, or an object below max_flatten_depth, makes the array list form.
+     *
+     * @return array{columns: array<string>, rows: array<array<mixed>>}|null
+     */
+    protected function flattenToTable(array $value): ?array
+    {
+        if (! $this->isArrayOfUniformObjects($value) || ! $this->flattener->hasNestedObjects($value)) {
+            return null;
+        }
+
+        $flattened = $this->flattener->flatten($value);
+
+        foreach ($flattened['rows'] as $row) {
+            foreach ($row as $cell) {
+                if (! $this->isScalar($cell)) {
+                    return null;
+                }
+            }
+        }
+
+        return $flattened;
     }
 
     protected function flattenedToToon(array $flattened, int $depth, ?string $parentKey = null): string
@@ -457,8 +480,7 @@ class ToonEncoder
                 $lines[] = $indentStr.$formattedKey.'[0]:';
             } elseif (is_array($val) && array_is_list($val) && $this->isArrayOfPrimitives($val)) {
                 $lines[] = $this->inlinePrimitiveArrayToToon($val, $depth, (string) $key);
-            } elseif (is_array($val) && array_is_list($val) && $this->isArrayOfUniformObjects($val) && $this->flattener->hasNestedObjects($val)) {
-                $flattened = $this->flattener->flatten($val);
+            } elseif (is_array($val) && array_is_list($val) && ($flattened = $this->flattenToTable($val)) !== null) {
                 $lines[] = $this->flattenedToToon($flattened, $depth, (string) $key);
             } elseif (is_array($val) && array_is_list($val) && $this->isArrayOfUniformPrimitiveObjects($val)) {
                 $lines[] = $this->arrayOfObjectsToToon($val, $depth, (string) $key);

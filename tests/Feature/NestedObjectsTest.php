@@ -139,3 +139,45 @@ it('does not flatten non-nested arrays', function () {
     expect($toon)->toContain('[2]{id,name}:');
     expect($toon)->not->toContain('.');
 });
+
+it('round-trips arrays of objects whose rows hold a list or an object below a nested object', function (array $data) {
+    expect(Toon::decode(Toon::encode($data)))->toEqual($data);
+})->with([
+    'a list beside null' => [['nodes' => [
+        ['id' => '1', 'body' => ['inputs' => null]],
+        ['id' => '2', 'body' => ['inputs' => ['x', 'y']]],
+    ]]],
+    'a list at the root' => [[
+        ['id' => '1', 'body' => ['inputs' => null]],
+        ['id' => '2', 'body' => ['inputs' => ['x', 'y']]],
+    ]],
+    'an empty list' => [['nodes' => [
+        ['id' => 1, 'body' => ['inputs' => []]],
+        ['id' => 2, 'body' => ['inputs' => []]],
+    ]]],
+    'a list of objects' => [['nodes' => [
+        ['id' => 1, 'body' => ['items' => [['a' => 1]]]],
+        ['id' => 2, 'body' => ['items' => [['a' => 2]]]],
+    ]]],
+    'a list beside a nested object' => [['nodes' => [
+        ['id' => 1, 'tags' => ['a'], 'body' => ['k' => 1]],
+        ['id' => 2, 'tags' => ['b', 'c'], 'body' => ['k' => 2]],
+    ]]],
+    'an object below the flatten depth' => [['nodes' => [
+        ['id' => 1, 'a' => ['b' => ['c' => ['d' => ['e' => 1]]]]],
+        ['id' => 2, 'a' => ['b' => ['c' => ['d' => ['e' => 2]]]]],
+    ]]],
+    'a list under a nested key' => [['wrap' => ['nodes' => [
+        ['id' => 1, 'body' => ['in' => ['x']]],
+        ['id' => 2, 'body' => ['in' => null]],
+    ]]]],
+]);
+
+it('keeps flattening nested objects that hold only scalars', function () {
+    $data = ['nodes' => [
+        ['id' => 1, 'body' => ['k' => 1, 'v' => null]],
+        ['id' => 2, 'body' => ['k' => 2, 'v' => 'x']],
+    ]];
+
+    expect(Toon::encode($data))->toBe("nodes[2]{id,body.k,body.v}:\n  1,1,null\n  2,2,x");
+});
